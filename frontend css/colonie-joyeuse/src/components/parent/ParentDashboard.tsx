@@ -110,8 +110,12 @@ export default function ParentDashboard() {
   const allEnfants = transparenceEnfants;
   const allParents = transparenceParents;
 
-  /** Désistement validé : pas dans les onglets Liste P / N1 / N2 (même logique d’affichage que l’admin). */
-  const dansOngletsListeTransparence = (e: Enfant) => e.desistement !== 'validé';
+  /**
+   * Désistement validé ou demande rejetée sur les infos (NON_VALIDEE → refusé) :
+   * pas dans les onglets transparence Liste P / N1 / N2 — sans changer les rangs en base.
+   */
+  const dansOngletsListeTransparence = (e: Enfant) =>
+    e.desistement !== 'validé' && (e.validation || 'en_attente') !== 'refusé';
 
   /** Fallback si `rangListe` absent (données mock) — ordre d’arrivée. Les données API ont `rangListe` = `rang_dans_liste`. */
   const rangAfficheParListe = useMemo(() => {
