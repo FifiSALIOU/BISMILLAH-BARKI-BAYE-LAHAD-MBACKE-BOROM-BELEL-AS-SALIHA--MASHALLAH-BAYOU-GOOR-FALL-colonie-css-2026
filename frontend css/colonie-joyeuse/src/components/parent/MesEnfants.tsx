@@ -150,11 +150,26 @@ export default function MesEnfants() {
                     </div>
                     <p className="text-sm text-muted-foreground">{calculateAge(enfant.dateNaissance)} ans — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'} — {enfant.lienParente}</p>
                     <p className="text-xs text-muted-foreground mt-0.5">Né(e) le {new Date(enfant.dateNaissance).toLocaleDateString('fr-FR')}</p>
-                    {/* Rang display */}
+                    {/*
+                    Ancien affichage (le rang était toujours visible, y compris après désistement) :
                     <div className="flex items-center gap-1.5 mt-1">
                       <Hash className="w-3 h-3 text-muted-foreground" />
                       <span className="text-xs font-medium text-muted-foreground">
                         Rang <strong className="text-foreground">{rang}</strong> — {getListeLabel(enfant.liste)}
+                      </span>
+                    </div>
+                    */}
+                    {/* Rang masqué à l’affichage seulement si désistement (réaffiche après réinscription). */}
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <Hash className="w-3 h-3 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {enfant.desistement ? (
+                          getListeLabel(enfant.liste)
+                        ) : (
+                          <>
+                            Rang <strong className="text-foreground">{rang}</strong> — {getListeLabel(enfant.liste)}
+                          </>
+                        )}
                       </span>
                     </div>
                   </div>

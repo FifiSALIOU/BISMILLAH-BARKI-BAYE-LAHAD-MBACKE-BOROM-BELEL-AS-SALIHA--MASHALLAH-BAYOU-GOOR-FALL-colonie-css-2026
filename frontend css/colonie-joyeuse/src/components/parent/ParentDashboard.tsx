@@ -492,11 +492,26 @@ export default function ParentDashboard() {
                   <p className="font-semibold text-foreground">{slot.enfant.prenom} {slot.enfant.nom}</p>
                   <p className="text-sm text-muted-foreground">{calculateAge(slot.enfant.dateNaissance)} ans — {slot.enfant.sexe === 'M' ? 'Garçon' : 'Fille'} — {slot.enfant.lienParente}</p>
                   
-                  {/* Rang and list */}
+                  {/*
+                  Ancien affichage (le rang était toujours visible, y compris après désistement) :
                   <div className="flex items-center gap-1.5">
                     <Hash className="w-3 h-3 text-muted-foreground" />
                     <span className="text-xs font-medium text-muted-foreground">
-                        Rang <strong className="text-foreground">{getRangDansListeLocal(slot.enfant.id)}</strong> — {getListeLabel(slot.enfant.liste)}
+                      Rang <strong className="text-foreground">{getRangDansListeLocal(slot.enfant.id)}</strong> — {getListeLabel(slot.enfant.liste)}
+                    </span>
+                  </div>
+                  */}
+                  {/* Rang et liste : rang masqué à l’affichage seulement si désistement (jusqu’à réinscription : désistement effacé). */}
+                  <div className="flex items-center gap-1.5">
+                    <Hash className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {slot.enfant.desistement ? (
+                        getListeLabel(slot.enfant.liste)
+                      ) : (
+                        <>
+                          Rang <strong className="text-foreground">{getRangDansListeLocal(slot.enfant.id)}</strong> — {getListeLabel(slot.enfant.liste)}
+                        </>
+                      )}
                     </span>
                   </div>
 
