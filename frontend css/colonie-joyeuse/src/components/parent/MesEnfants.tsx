@@ -177,6 +177,7 @@ export default function MesEnfants() {
                   {enfant.validation === 'refusé' && (
                     <span className="text-xs font-medium px-3 py-1 rounded-lg bg-destructive/10 text-destructive border border-destructive/20 flex items-center gap-1">
                       <XCircle className="w-3 h-3" /> Refusé — {enfant.motifRefus}
+                      {enfant.rejetDefinitif ? ' (définitif)' : ''}
                     </span>
                   )}
 
@@ -189,25 +190,25 @@ export default function MesEnfants() {
                   )}
 
                   <div className="flex gap-2 mt-1 flex-wrap">
-                    {!inscriptionsCloturees && enfant.statut !== 'Titulaire' && enfant.lienParente !== 'Autre' && !enfant.desistement && (
+                    {!inscriptionsCloturees && enfant.statut !== 'Titulaire' && enfant.lienParente !== 'Autre' && !enfant.desistement && !enfant.rejetDefinitif && (
                       <Button variant="outline" size="sm" onClick={() => handleSetTitulaire(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs">
                         <ArrowUpDown className="w-3 h-3" />Définir titulaire
                       </Button>
                     )}
 
-                    {!enfant.desistement && enfant.validation !== 'refusé' && (
+                    {!enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && (
                       <Button variant="outline" size="sm" onClick={() => handleDesistement(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
                         <HandMetal className="w-3 h-3" />Désistement
                       </Button>
                     )}
 
-                    {enfant.desistement === 'demandé' && (
+                    {enfant.desistement === 'demandé' && !enfant.rejetDefinitif && (
                       <Button variant="outline" size="sm" onClick={() => handleAnnulerDesistement(enfant.id)} className="rounded-lg gap-1 text-xs text-amber-700 border-amber-300 hover:bg-amber-50">
                         <XCircle className="w-3 h-3" />Annuler désistement
                       </Button>
                     )}
 
-                    {!inscriptionsCloturees && enfant.desistement === 'validé' && (
+                    {!inscriptionsCloturees && enfant.desistement === 'validé' && !enfant.rejetDefinitif && (
                       <Button variant="outline" size="sm" onClick={() => handleReinscrire(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs hover:bg-accent hover:text-white hover:border-accent">
                         <RotateCcw className="w-3 h-3" />Réinscrire
                       </Button>

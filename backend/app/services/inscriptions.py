@@ -6,7 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
-from app.models.enums import DemandeStatut, LienParente, ListeCode
+from app.models.enums import DemandeStatut, LienParente, ListeCode, Sexe
 from app.models.models import DemandeInscription, Enfant, Liste, Parent, Service, User
 from app.services.runtime_settings_store import get_max_enfants_par_parent
 from app.services.users import (
@@ -17,6 +17,19 @@ from app.services.users import (
 )
 
 DEFAULT_MAX_ENFANTS_PAR_PARENT = 2
+
+
+def demande_compte_pour_rang_actif(d: DemandeInscription) -> bool:
+    """Rangs visibles 1..n : SOUMISE et RETENUE. NON_VALIDEE et DESISTEE : queue (renumérotation inchangée : `*_sorted` puis refoulement)."""
+    return d.statut in (DemandeStatut.SOUMISE, DemandeStatut.RETENUE)
+
+
+def _require_not_rejet_definitif(demande: DemandeInscription) -> None:
+    if demande.statut == DemandeStatut.NON_VALIDEE and demande.rejet_definitif:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cette demande a été définitivement refusée.",
+        )
 
 
 def _validate_annee_naissance(d: date) -> None:
@@ -68,10 +81,10 @@ def _next_rang_for_liste(db: Session, liste_id: int) -> int:
     if not rows:
         return 1
 
-    active = [d for d in rows if d.statut != DemandeStatut.DESISTEE]
-    desistees = [d for d in rows if d.statut == DemandeStatut.DESISTEE]
+    active = [d for d in rows if demande_compte_pour_rang_actif(d)]
+    queue = [d for d in rows if not demande_compte_pour_rang_actif(d)]
     active_sorted = sorted(active, key=lambda d: (d.rang_dans_liste, d.id))
-    desist_sorted = sorted(desistees, key=lambda d: (d.rang_dans_liste, d.id))
+    queue_sorted = sorted(queue, key=lambda d: (d.rang_dans_liste, d.id))
 
     temp = -1
     for d in rows:
@@ -84,7 +97,7 @@ def _next_rang_for_liste(db: Session, liste_id: int) -> int:
         d.rang_dans_liste = r
         r += 1
     next_rang = r
-    for d in desist_sorted:
+    for d in queue_sorted:
         d.rang_dans_liste = r
         r += 1
     db.flush()
@@ -106,8 +119,8 @@ def resequence_rangs_pour_liste(db: Session, liste_id: int, *, demande_reinscrit
     if not rows:
         return
 
-    active = [d for d in rows if d.statut != DemandeStatut.DESISTEE]
-    desistees = [d for d in rows if d.statut == DemandeStatut.DESISTEE]
+    active = [d for d in rows if demande_compte_pour_rang_actif(d)]
+    queue = [d for d in rows if not demande_compte_pour_rang_actif(d)]
     rein = [d for d in active if int(d.id) == int(demande_reinscrite_id)]
     others = [d for d in active if int(d.id) != int(demande_reinscrite_id)]
     if not rein:
@@ -117,7 +130,7 @@ def resequence_rangs_pour_liste(db: Session, liste_id: int, *, demande_reinscrit
         )
     others_sorted = sorted(others, key=lambda d: (d.rang_dans_liste, d.id))
     active_sorted = others_sorted + rein
-    desist_sorted = sorted(desistees, key=lambda x: (x.rang_dans_liste, x.id))
+    queue_sorted = sorted(queue, key=lambda x: (x.rang_dans_liste, x.id))
 
     temp = -1
     for d in rows:
@@ -129,7 +142,7 @@ def resequence_rangs_pour_liste(db: Session, liste_id: int, *, demande_reinscrit
     for d in active_sorted:
         d.rang_dans_liste = r
         r += 1
-    for d in desist_sorted:
+    for d in queue_sorted:
         d.rang_dans_liste = r
         r += 1
     db.flush()
@@ -149,10 +162,10 @@ def resequence_rangs_apres_desistement_valide(db: Session, liste_id: int) -> Non
     )
     if not rows:
         return
-    active = [d for d in rows if d.statut != DemandeStatut.DESISTEE]
-    desistees = [d for d in rows if d.statut == DemandeStatut.DESISTEE]
+    active = [d for d in rows if demande_compte_pour_rang_actif(d)]
+    queue = [d for d in rows if not demande_compte_pour_rang_actif(d)]
     active_sorted = sorted(active, key=lambda d: (d.rang_dans_liste, d.id))
-    desist_sorted = sorted(desistees, key=lambda d: (d.rang_dans_liste, d.id))
+    queue_sorted = sorted(queue, key=lambda d: (d.rang_dans_liste, d.id))
     temp = -1
     for d in rows:
         d.rang_dans_liste = temp
@@ -162,7 +175,7 @@ def resequence_rangs_apres_desistement_valide(db: Session, liste_id: int) -> Non
     for d in active_sorted:
         d.rang_dans_liste = r
         r += 1
-    for d in desist_sorted:
+    for d in queue_sorted:
         d.rang_dans_liste = r
         r += 1
     db.flush()
@@ -341,6 +354,14 @@ def set_titulaire(*, db: Session, user: User, enfant_id_titulaire: int) -> None:
         enfant_titulaire = enfants_by_id.get(int(enfant_id_titulaire))
     if enfant_titulaire is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enfant introuvable pour ce parent.")
+    dem_check = demande or (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(Enfant.id == enfant_titulaire.id, Enfant.parent_id == parent.id)
+        .first()
+    )
+    if dem_check is not None:
+        _require_not_rejet_definitif(dem_check)
 
     ancien_titulaire = next((e for e in enfants if e.is_titulaire), None)
 
@@ -361,6 +382,9 @@ def set_titulaire(*, db: Session, user: User, enfant_id_titulaire: int) -> None:
     nouvelle_demande = demande_by_enfant_id.get(int(enfant_titulaire.id))
     if ancienne_demande is None or nouvelle_demande is None:
         return
+
+    for d in (ancienne_demande, nouvelle_demande):
+        _require_not_rejet_definitif(d)
 
     ancienne_liste_id = int(ancienne_demande.liste_id)
     ancien_rang = int(ancienne_demande.rang_dans_liste)
@@ -398,6 +422,7 @@ def request_desistement(*, db: Session, user: User, demande_id: int, reason: str
     )
     if not demande:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande introuvable.")
+    _require_not_rejet_definitif(demande)
     if demande.statut == DemandeStatut.DESISTEE:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Cette demande est déjà désistée.")
     if demande.desistement is not None:
@@ -461,4 +486,40 @@ def reinscrire_desiste(*, db: Session, user: User, demande_id: int) -> DemandeIn
     demande.updated_at = datetime.now(timezone.utc)
     db.flush()
     resequence_rangs_pour_liste(db, int(demande.liste_id), demande_reinscrite_id=int(demande.id))
+    return demande
+
+
+def admin_corriger_demande_rejetee(
+    *,
+    db: Session,
+    demande_id: int,
+    prenom: str,
+    nom: str,
+    date_naissance: date,
+    sexe: Sexe,
+    lien_parente: LienParente,
+) -> DemandeInscription:
+    """Remet une demande NON_VALIDEE (non définitive) en SOUMISE, après correction des infos enfant — rang via `_next_rang_for_liste`."""
+    demande = db.query(DemandeInscription).filter(DemandeInscription.id == demande_id).first()
+    if not demande:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande introuvable.")
+    if demande.statut != DemandeStatut.NON_VALIDEE or demande.rejet_definitif:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Correction impossible : demande non concernée ou refus définitif.",
+        )
+    _validate_annee_naissance(date_naissance)
+    enfant = demande.enfant
+    enfant.prenom = (prenom or "").strip()[:191] or enfant.prenom
+    enfant.nom = (nom or "").strip()[:191] or enfant.nom
+    enfant.date_naissance = date_naissance
+    enfant.sexe = sexe
+    enfant.lien_parente = lien_parente
+    enfant.updated_at = datetime.now(timezone.utc)
+    demande.statut = DemandeStatut.SOUMISE
+    demande.non_validation_reason = ""
+    demande.updated_at = datetime.now(timezone.utc)
+    db.flush()
+    _next_rang_for_liste(db, int(demande.liste_id))
+    db.refresh(demande)
     return demande

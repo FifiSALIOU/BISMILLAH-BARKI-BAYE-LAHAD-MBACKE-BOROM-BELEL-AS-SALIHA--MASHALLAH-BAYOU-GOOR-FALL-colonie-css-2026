@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
-from app.models.enums import DemandeStatut, ListeCode, UserRole
+from app.models.enums import DemandeStatut, ListeCode, LienParente, Sexe, UserRole
 from app.models.models import DemandeInscription, Desistement, Enfant, Liste, Parent, Service, Site, User
 from app.services.email import send_email, uniq_emails
 from app.services.email_templates import (
@@ -22,7 +22,12 @@ from app.services.email_templates import (
     subject_transfer,
 )
 from app.services.historique_metier import append_historique_best_effort
-from app.services.inscriptions import ensure_listes_exist, resequence_rangs_apres_desistement_valide, _next_rang_for_liste
+from app.services.inscriptions import (
+    admin_corriger_demande_rejetee,
+    ensure_listes_exist,
+    resequence_rangs_apres_desistement_valide,
+    _next_rang_for_liste,
+)
 from app.services.liste_finale_compute import demandes_liste_finale_retenus_si_cloturees
 from app.services.notify_helpers import collect_admin_emails
 from app.services.runtime_settings_store import merge_with_defaults, read_settings, write_settings
@@ -47,6 +52,14 @@ class RuntimeSettingsIn(BaseModel):
 class FinalSelectionIn(BaseModel):
     is_selection_finale: bool
     non_validation_reason: Optional[str] = Field(default=None, max_length=2000)
+
+
+class CorrigerRejetIn(BaseModel):
+    enfant_prenom: str = Field(min_length=1, max_length=191)
+    enfant_nom: str = Field(min_length=1, max_length=191)
+    enfant_date_naissance: date
+    enfant_sexe: Sexe
+    enfant_lien_parente: LienParente
 
 
 class TransferIn(BaseModel):
@@ -365,7 +378,10 @@ def list_demandes_par_liste(
 
     demandes = (
         db.query(DemandeInscription)
-        .filter(DemandeInscription.liste_id == liste.id)
+        .filter(
+            DemandeInscription.liste_id == liste.id,
+            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE)),
+        )
         .order_by(DemandeInscription.rang_dans_liste.asc())
         .all()
     )
@@ -404,6 +420,163 @@ def list_demandes_par_liste(
     return [_row(d) for d in demandes]
 
 
+def _row_rejet_admin(d: DemandeInscription) -> dict:
+    e = d.enfant
+    p = e.parent
+    liste = d.liste
+    d_ins = d.date_inscription
+    if isinstance(d_ins, datetime):
+        date_ins_str = d_ins.date().isoformat() if d_ins else ""
+    else:
+        date_ins_str = d_ins.isoformat() if d_ins else ""
+    return {
+        "demande_id": d.id,
+        "liste": liste.code.value,
+        "rang": d.rang_dans_liste,
+        "date_inscription": date_ins_str,
+        "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+        "statut": d.statut.value,
+        "rejet_definitif": d.rejet_definitif,
+        "non_validation_reason": d.non_validation_reason or None,
+        "is_reinscrit": False,
+        "parent_matricule": p.matricule,
+        "parent_prenom": p.prenom,
+        "parent_nom": p.nom,
+        "parent_service": p.service_text,
+        "parent_telephone": p.telephone,
+        "parent_site": p.site_text or None,
+        "enfant": {
+            "id": e.id,
+            "prenom": e.prenom,
+            "nom": e.nom,
+            "date_naissance": e.date_naissance.isoformat() if e.date_naissance else None,
+            "sexe": e.sexe.value,
+            "lien_parente": e.lien_parente.value,
+            "is_titulaire": e.is_titulaire,
+        },
+    }
+
+
+@router.get("/demandes/rejets")
+def list_demandes_rejets(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
+):
+    """NON_VALIDÉES : en attente de correction vs refus définitif (plus de liste P/N1/N2)."""
+    _ = user
+    ensure_listes_exist(db)
+    demandes = (
+        db.query(DemandeInscription)
+        .options(
+            joinedload(DemandeInscription.enfant).joinedload(Enfant.parent),
+            joinedload(DemandeInscription.liste),
+        )
+        .filter(DemandeInscription.statut == DemandeStatut.NON_VALIDEE)
+        .order_by(DemandeInscription.updated_at.desc(), DemandeInscription.id.desc())
+        .all()
+    )
+    en_attente = [_row_rejet_admin(d) for d in demandes if not d.rejet_definitif]
+    definitifs = [_row_rejet_admin(d) for d in demandes if d.rejet_definitif]
+    return {"en_attente_correction": en_attente, "refus_definitifs": definitifs}
+
+
+def _row_demande_lecture_admin(d: DemandeInscription) -> dict:
+    """Même forme que `GET /admin/listes/{code}/demandes` pour compatibilité front (ex. désistés)."""
+    e = d.enfant
+    p = e.parent
+    liste = d.liste
+    sel = d.statut == DemandeStatut.RETENUE
+    return {
+        "demande_id": d.id,
+        "liste": liste.code.value,
+        "rang": d.rang_dans_liste,
+        "date_inscription": d.date_inscription,
+        "updated_at": d.updated_at.isoformat() if d.updated_at else None,
+        "statut": d.statut.value,
+        "is_reinscrit": (d.statut == DemandeStatut.SOUMISE and d.updated_at is not None),
+        "non_validation_reason": d.non_validation_reason or None,
+        "selection_finale": sel,
+        "parent_matricule": p.matricule,
+        "parent_prenom": p.prenom,
+        "parent_nom": p.nom,
+        "parent_service": p.service_text,
+        "parent_telephone": p.telephone,
+        "parent_site": p.site_text or None,
+        "enfant": {
+            "id": e.id,
+            "prenom": e.prenom,
+            "nom": e.nom,
+            "date_naissance": e.date_naissance,
+            "sexe": e.sexe.value,
+            "lien_parente": e.lien_parente.value,
+            "is_titulaire": e.is_titulaire,
+        },
+    }
+
+
+@router.get("/demandes/desistees")
+def list_demandes_desistees(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
+):
+    """Toutes les demandes DESISTEE (consultation) — ne figurent plus dans GET listes/{code}/demandes."""
+    _ = user
+    ensure_listes_exist(db)
+    demandes = (
+        db.query(DemandeInscription)
+        .options(
+            joinedload(DemandeInscription.enfant).joinedload(Enfant.parent),
+            joinedload(DemandeInscription.liste),
+        )
+        .filter(DemandeInscription.statut == DemandeStatut.DESISTEE)
+        .order_by(DemandeInscription.updated_at.desc(), DemandeInscription.id.desc())
+        .all()
+    )
+    return [_row_demande_lecture_admin(d) for d in demandes]
+
+
+@router.post("/demandes/{demande_id}/corriger-rejet")
+def corriger_demande_rejet(
+    demande_id: int,
+    payload: CorrigerRejetIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
+):
+    _ = user
+    demande = admin_corriger_demande_rejetee(
+        db=db,
+        demande_id=demande_id,
+        prenom=payload.enfant_prenom,
+        nom=payload.enfant_nom,
+        date_naissance=payload.enfant_date_naissance,
+        sexe=payload.enfant_sexe,
+        lien_parente=payload.enfant_lien_parente,
+    )
+    db.commit()
+    db.refresh(demande)
+    return {"ok": True, "demande_id": demande.id}
+
+
+@router.post("/demandes/{demande_id}/refus-definitif")
+def refus_definitif_demande(
+    demande_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
+):
+    _ = user
+    demande = db.query(DemandeInscription).filter(DemandeInscription.id == demande_id).first()
+    if not demande:
+        raise HTTPException(status_code=404, detail="Demande introuvable.")
+    if demande.statut != DemandeStatut.NON_VALIDEE:
+        raise HTTPException(status_code=400, detail="Seules les demandes non validées peuvent être refusées définitivement.")
+    if demande.rejet_definitif:
+        raise HTTPException(status_code=400, detail="Cette demande est déjà en refus définitif.")
+    demande.rejet_definitif = True
+    demande.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"ok": True}
+
+
 @router.post("/demandes/{demande_id}/selection-finale")
 def set_selection_finale(
     demande_id: int,
@@ -427,9 +600,11 @@ def set_selection_finale(
     if payload.is_selection_finale:
         demande.statut = DemandeStatut.RETENUE
         demande.non_validation_reason = ""
+        demande.rejet_definitif = False
     else:
         demande.statut = DemandeStatut.NON_VALIDEE
         demande.non_validation_reason = (payload.non_validation_reason or "").strip()[:191] or ""
+        demande.rejet_definitif = False
     demande.updated_at = when
 
     is_refus = not payload.is_selection_finale
@@ -437,6 +612,9 @@ def set_selection_finale(
     demande_id_h = int(demande.id)
     motif_h = (payload.non_validation_reason or "").strip() if is_refus else ""
 
+    if is_refus:
+        db.flush()
+        resequence_rangs_apres_desistement_valide(db, int(demande.liste_id))
     db.commit()
 
     if is_refus:

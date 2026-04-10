@@ -74,6 +74,10 @@ class DemandeOut(BaseModel):
     )
     has_desistement_pending: bool = False
     is_reinscrit: bool = False
+    rejet_definitif: bool = Field(
+        default=False,
+        description="True si refus administratif définitif (plus aucune action parent).",
+    )
     date_desistement: Optional[datetime] = Field(
         default=None,
         description="Désistement validé: updated_at de la demande. En attente: created_at du désistement.",

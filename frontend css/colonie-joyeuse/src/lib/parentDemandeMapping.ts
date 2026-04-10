@@ -13,6 +13,7 @@ export type DemandeOutApi = {
   is_selection_finale: boolean;
   has_desistement_pending: boolean;
   is_reinscrit: boolean;
+  rejet_definitif?: boolean;
   date_desistement?: string | null;
   enfant_id: number;
   enfant_prenom: string;
@@ -150,6 +151,7 @@ export function mapDemandeOutToEnfant(d: DemandeOutApi, parentMatricule: string)
     validation,
     motifRefus,
     reinscrit: !!d.is_reinscrit,
+    rejetDefinitif: !!d.rejet_definitif,
   };
 }
 
@@ -172,6 +174,7 @@ export function mapTransparenceRowToEnfant(row: TransparenceRowApi): Enfant {
     enfant_sexe: row.enfant_sexe,
     enfant_lien_parente: row.enfant_lien_parente,
     enfant_is_titulaire: row.enfant_is_titulaire,
+    rejet_definitif: false,
   };
   const e = mapDemandeOutToEnfant(d, row.parent_matricule);
   return { ...e, enfantDbId: row.enfant_id };

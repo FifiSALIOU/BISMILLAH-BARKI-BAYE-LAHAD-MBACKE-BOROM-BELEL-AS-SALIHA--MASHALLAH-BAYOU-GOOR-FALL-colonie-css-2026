@@ -100,7 +100,8 @@ export default function ListeFinale() {
       apiRequest<any[]>(`/admin/listes/${listeUiToApi('attente_n1')}/demandes`, { token }),
       apiRequest<any[]>(`/admin/listes/${listeUiToApi('attente_n2')}/demandes`, { token }),
       apiRequest<any[]>('/admin/desistements/en-attente', { token }),
-    ]).then(([cfg, p, n1, n2, desistements]) => {
+      apiRequest<any[]>('/admin/demandes/desistees', { token }),
+    ]).then(([cfg, p, n1, n2, desistements, desisteesRows]) => {
       setSettings(cfg);
       const cloture = areInscriptionsClosed(cfg);
       if (!cloture) {
@@ -157,13 +158,11 @@ export default function ListeFinale() {
           });
         }
       }
-      const desistesValides = all
-        .filter((e) => e.demandeStatut === 'DESISTEE')
-        .map((e) => ({
-          ...e,
-          desistement: 'validé' as const,
-          dateDesistement: e.updatedAt || e.dateInscription,
-        }));
+      const desistesValides = mapRows(desisteesRows || []).map((e) => ({
+        ...e,
+        desistement: 'validé' as const,
+        dateDesistement: e.updatedAt || e.dateInscription,
+      }));
       setEnfantsDesistes([...desistesValides, ...pending].sort(sortOrdreListeFinale));
 
       setListeFinaleGeneree(true);

@@ -245,12 +245,6 @@ export default function GestionListe({ type }: Props) {
       token,
       body: JSON.stringify({ is_selection_finale: false, non_validation_reason: motifRefus.trim() }),
     });
-    const targetListeUi: ListeUi = type === 'principale' ? 'attente_n1' : 'attente_n2';
-    await apiRequest(`/admin/demandes/${refusTarget.demandeId}/transferer`, {
-      method: 'POST',
-      token,
-      body: JSON.stringify({ to_liste_code: listeUiToApi(targetListeUi), reason: `Refus conformité: ${motifRefus.trim()}` }),
-    });
     addHistorique({ utilisateur: 'Gestionnaire', role: 'Admin', action: 'Refus', details: `A refusé la demande de ${refusTarget.prenom} ${refusTarget.nom}. Motif : ${motifRefus.trim()}`, cible: `${refusTarget.prenom} ${refusTarget.nom}` });
     toast({ title: '❌ Demande refusée', description: `${refusTarget.prenom} ${refusTarget.nom} — Motif : ${motifRefus}` });
     setRefusOpen(false); setRefusTarget(null); setMotifRefus('');

@@ -413,6 +413,9 @@ def _to_demande_out(db: Session, demande: DemandeInscription) -> DemandeOut:
         is_selection_finale=(demande.statut == DemandeStatut.RETENUE),
         has_desistement_pending=(demande.desistement is not None and demande.statut != DemandeStatut.DESISTEE),
         is_reinscrit=(demande.statut == DemandeStatut.SOUMISE and demande.updated_at is not None),
+        rejet_definitif=bool(
+            demande.statut == DemandeStatut.NON_VALIDEE and getattr(demande, "rejet_definitif", False)
+        ),
         date_desistement=_date_desistement_affichage(demande),
         enfant_id=enfant.id,
         enfant_prenom=enfant.prenom,

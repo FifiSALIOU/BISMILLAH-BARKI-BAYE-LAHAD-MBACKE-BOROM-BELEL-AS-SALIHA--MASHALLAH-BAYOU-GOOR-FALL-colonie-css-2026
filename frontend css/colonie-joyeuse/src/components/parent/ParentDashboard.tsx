@@ -506,6 +506,11 @@ export default function ParentDashboard() {
 
                   {/* Validation badge (rien si soumise sans refus) */}
                   {getValidationBadge(slot.enfant)}
+                  {slot.enfant.rejetDefinitif && (
+                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold bg-destructive/15 text-destructive border border-destructive/25">
+                      Refus définitif — aucune action possible
+                    </span>
+                  )}
 
                   {/* Désistement badges */}
                   {slot.enfant.desistement === 'demandé' && (
@@ -524,22 +529,22 @@ export default function ParentDashboard() {
 
                   {/* Action buttons */}
                   <div className="flex gap-2 mt-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                    {!inscriptionsCloturees && slot.enfant.statut !== 'Titulaire' && slot.enfant.lienParente !== 'Autre' && !slot.enfant.desistement && (
+                    {!inscriptionsCloturees && slot.enfant.statut !== 'Titulaire' && slot.enfant.lienParente !== 'Autre' && !slot.enfant.desistement && !slot.enfant.rejetDefinitif && (
                       <Button variant="outline" size="sm" onClick={() => handleSetTitulaire(slot.enfant!.id, `${slot.enfant!.prenom} ${slot.enfant!.nom}`)} className="rounded-lg gap-1 text-xs">
                         <ArrowUpDown className="w-3 h-3" />Définir titulaire
                       </Button>
                     )}
-                    {!slot.enfant.desistement && slot.enfant.validation !== 'refusé' && (
+                    {!slot.enfant.desistement && slot.enfant.validation !== 'refusé' && !slot.enfant.rejetDefinitif && (
                       <Button variant="outline" size="sm" onClick={() => handleDesistement(slot.enfant!.id, `${slot.enfant!.prenom} ${slot.enfant!.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
                         <HandMetal className="w-3 h-3" />Désistement
                       </Button>
                     )}
-                    {slot.enfant.desistement === 'demandé' && (
+                    {slot.enfant.desistement === 'demandé' && !slot.enfant.rejetDefinitif && (
                       <Button variant="outline" size="sm" onClick={() => handleAnnulerDesistement(slot.enfant!.id)} className="rounded-lg gap-1 text-xs text-amber-700 border-amber-300 hover:bg-amber-50">
                         <XCircle className="w-3 h-3" />Annuler désistement
                       </Button>
                     )}
-                    {!inscriptionsCloturees && slot.enfant.desistement === 'validé' && (
+                    {!inscriptionsCloturees && slot.enfant.desistement === 'validé' && !slot.enfant.rejetDefinitif && (
                       <Button variant="outline" size="sm" onClick={() => handleReinscrire(slot.enfant!.id, `${slot.enfant!.prenom} ${slot.enfant!.nom}`)} className="rounded-lg gap-1 text-xs hover:bg-accent hover:text-white hover:border-accent">
                         <RotateCcw className="w-3 h-3" />Réinscrire
                       </Button>

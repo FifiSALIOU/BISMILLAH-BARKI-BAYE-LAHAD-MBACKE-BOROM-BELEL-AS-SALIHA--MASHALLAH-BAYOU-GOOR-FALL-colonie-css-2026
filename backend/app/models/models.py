@@ -141,6 +141,7 @@ class DemandeInscription(Base):
         nullable=False,
     )
     non_validation_reason: Mapped[str] = mapped_column("motif_rejet", String(191), nullable=False)
+    rejet_definitif: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     liste_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("listes.id"), nullable=False)
     enfant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("enfants.id"), nullable=False)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)

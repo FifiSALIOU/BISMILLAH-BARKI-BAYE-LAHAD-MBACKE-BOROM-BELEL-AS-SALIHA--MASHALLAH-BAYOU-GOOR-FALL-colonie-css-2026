@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { apiRequest } from '@/lib/api';
-import { listeApiToUi, listeUiToApi, statutLabelFromListeUi, type ListeUi } from '@/lib/listeCodes';
+import { listeApiToUi, statutLabelFromListeUi, type ListeUi } from '@/lib/listeCodes';
 
 type Row = {
   id: string;
@@ -95,12 +95,10 @@ export default function ListeDemandesDesistees() {
   const [detail, setDetail] = useState<Row | null>(null);
   useEffect(() => {
     if (!token) return;
-    const codes = [listeUiToApi('principale'), listeUiToApi('attente_n1'), listeUiToApi('attente_n2')] as const;
-    Promise.all(codes.map((code) => apiRequest<any[]>(`/admin/listes/${code}/demandes`, { token })))
-      .then(([p, n1, n2]) => {
-        const all = [...p, ...n1, ...n2];
+    apiRequest<any[]>('/admin/demandes/desistees', { token })
+      .then((all) => {
         const out: Row[] = [];
-        for (const d of all) {
+        for (const d of all || []) {
           const r = mapApiRow(d);
           if (r) out.push(r);
         }

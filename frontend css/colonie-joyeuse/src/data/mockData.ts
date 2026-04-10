@@ -37,6 +37,8 @@ export interface Enfant {
   rangListe?: number;
   /** True si le gestionnaire a validé la conformité des informations (statut RETENUE) — indépendant de la liste finale. */
   informationsValideesParAdmin?: boolean;
+  /** Refus administratif définitif (plus aucune action côté parent). */
+  rejetDefinitif?: boolean;
 }
 
 export interface Inscription {

@@ -1,46 +1,75 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, Eye, ThumbsDown } from 'lucide-react';
+import { Search, RotateCcw, Ban } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiRequest } from '@/lib/api';
-import { listeApiToUi, listeUiToApi, statutLabelFromListeUi, type ListeUi } from '@/lib/listeCodes';
+import { listeApiToUi, statutLabelFromListeUi, type ListeUi } from '@/lib/listeCodes';
+import { toast } from '@/hooks/use-toast';
+import type { Enfant } from '@/data/mockData';
 
-type Row = {
-  id: string;
-  demandeId: number;
-  parentMatricule: string;
+type ApiEnfant = {
+  id: number;
   prenom: string;
   nom: string;
-  dateNaissance: string;
-  sexe: 'M' | 'F';
-  lienParente: string;
-  liste: ListeUi;
-  statut: 'Titulaire' | 'Suppléant N1' | 'Suppléant N2';
-  dateInscription: string;
-  updatedAt?: string | null;
-  parentNom?: string;
-  parentPrenom?: string;
-  parentService?: string;
-  parentAgence?: string;
-  parentEmail?: string;
-  parentTelephone?: string;
+  date_naissance: string | null;
+  sexe: string;
+  lien_parente: string;
+  is_titulaire: boolean;
+};
+
+export type RejetApiRow = {
+  demande_id: number;
+  liste: string;
   rang: number;
-  reinscrit?: boolean;
-  motifRefus?: string;
+  date_inscription: string;
+  updated_at?: string | null;
+  statut: string;
+  rejet_definitif: boolean;
+  non_validation_reason?: string | null;
+  parent_matricule: string;
+  parent_prenom: string;
+  parent_nom: string;
+  parent_service: string;
+  parent_telephone?: string;
+  parent_site?: string | null;
+  enfant: ApiEnfant;
 };
 
-const priorityListe: Record<ListeUi, number> = {
-  principale: 0,
-  attente_n1: 1,
-  attente_n2: 2,
+type RejetsResponse = {
+  en_attente_correction: RejetApiRow[];
+  refus_definitifs: RejetApiRow[];
 };
 
-function getListeLabel(liste: ListeUi): string {
-  switch (liste) {
+const LIEN_FR_TO_API: Record<Enfant['lienParente'], string> = {
+  Père: 'PERE',
+  Mère: 'MERE',
+  'Tuteur légal': 'TUTEUR_LEGAL',
+  Autre: 'AUTRE',
+};
+
+const LIEN_API_TO_FR: Record<string, Enfant['lienParente']> = {
+  PERE: 'Père',
+  MERE: 'Mère',
+  TUTEUR_LEGAL: 'Tuteur légal',
+  AUTRE: 'Autre',
+};
+
+function getListeLabelFromApi(code: string): string {
+  const lu = listeApiToUi(code);
+  switch (lu) {
     case 'principale':
       return 'Liste Principale';
     case 'attente_n1':
@@ -48,7 +77,7 @@ function getListeLabel(liste: ListeUi): string {
     case 'attente_n2':
       return "Liste d'Attente N°2";
     default:
-      return liste;
+      return code;
   }
 }
 
@@ -61,89 +90,258 @@ const calculateAge = (dateNaissance: string): number => {
   return age;
 };
 
-function mapApiRow(d: any): Row | null {
-  const apiDemandeStatut = String(d.statut || '');
-  if (apiDemandeStatut !== 'NON_VALIDEE') return null;
-  const lu = listeApiToUi(d.liste);
-  return {
-    id: String(d.enfant?.id ?? d.demande_id),
-    demandeId: d.demande_id,
-    parentMatricule: d.parent_matricule,
-    prenom: d.enfant?.prenom || '',
-    nom: d.enfant?.nom || '',
-    dateNaissance: d.enfant?.date_naissance || '',
-    sexe: d.enfant?.sexe === 'F' ? 'F' : 'M',
-    lienParente: d.enfant?.lien_parente || '',
-    liste: lu,
-    statut: statutLabelFromListeUi(lu),
-    dateInscription: d.date_inscription,
-    updatedAt: d.updated_at ?? null,
-    parentNom: d.parent_nom,
-    parentPrenom: d.parent_prenom,
-    parentService: d.parent_service,
-    parentTelephone: d.parent_telephone || undefined,
-    parentAgence: d.parent_site || '',
-    parentEmail: undefined,
-    rang: d.rang || 0,
-    reinscrit: !!d.is_reinscrit,
-    motifRefus: (d.non_validation_reason || '').trim() || undefined,
-  };
-}
-
 export default function ListeDemandesRejetees() {
   const { token } = useAuth();
-  const [rows, setRows] = useState<Row[]>([]);
+  const [enAttente, setEnAttente] = useState<RejetApiRow[]>([]);
+  const [definitifs, setDefinitifs] = useState<RejetApiRow[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [detail, setDetail] = useState<Row | null>(null);
-  useEffect(() => {
+
+  const load = useCallback(async () => {
     if (!token) return;
-    const codes = [listeUiToApi('principale'), listeUiToApi('attente_n1'), listeUiToApi('attente_n2')] as const;
-    Promise.all(codes.map((code) => apiRequest<any[]>(`/admin/listes/${code}/demandes`, { token })))
-      .then(([p, n1, n2]) => {
-        const all = [...p, ...n1, ...n2];
-        const out: Row[] = [];
-        for (const d of all) {
-          const r = mapApiRow(d);
-          if (r) out.push(r);
-        }
-        setRows(out);
-      })
-      .catch(() => undefined);
+    try {
+      const res = await apiRequest<RejetsResponse>('/admin/demandes/rejets', { token });
+      setEnAttente(res?.en_attente_correction ?? []);
+      setDefinitifs(res?.refus_definitifs ?? []);
+    } catch {
+      toast({ title: 'Erreur', description: 'Impossible de charger les demandes rejetées.', variant: 'destructive' });
+    }
   }, [token]);
 
-  const sorted = useMemo(() => {
-    return [...rows].sort((a, b) => {
-      const pa = priorityListe[a.liste];
-      const pb = priorityListe[b.liste];
-      if (pa !== pb) return pa - pb;
-      if (a.rang !== b.rang) return a.rang - b.rang;
-      return a.demandeId - b.demandeId;
-    });
-  }, [rows]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
-  const filtered = sorted.filter((e) => {
-    if (!searchTerm.trim()) return true;
-    const s = searchTerm.toLowerCase();
+  const st = searchTerm.trim().toLowerCase();
+  const rowMatch = (r: RejetApiRow) => {
+    if (!st) return true;
+    const motif = (r.non_validation_reason || '').toLowerCase();
     return (
-      e.parentMatricule.toLowerCase().includes(s) ||
-      e.nom.toLowerCase().includes(s) ||
-      e.prenom.toLowerCase().includes(s) ||
-      (e.parentNom || '').toLowerCase().includes(s) ||
-      (e.parentPrenom || '').toLowerCase().includes(s) ||
-      (e.motifRefus || '').toLowerCase().includes(s)
+      r.parent_matricule.toLowerCase().includes(st) ||
+      r.enfant.nom.toLowerCase().includes(st) ||
+      r.enfant.prenom.toLowerCase().includes(st) ||
+      `${r.parent_prenom} ${r.parent_nom}`.toLowerCase().includes(st) ||
+      motif.includes(st)
     );
-  });
+  };
+  const attF = enAttente.filter(rowMatch);
+  const defF = definitifs.filter(rowMatch);
+
+  const [corrigerRow, setCorrigerRow] = useState<RejetApiRow | null>(null);
+  const [refusDefRow, setRefusDefRow] = useState<RejetApiRow | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const [formPrenom, setFormPrenom] = useState('');
+  const [formNom, setFormNom] = useState('');
+  const [formDn, setFormDn] = useState('');
+  const [formSexe, setFormSexe] = useState<'M' | 'F'>('M');
+  const [formLien, setFormLien] = useState<Enfant['lienParente']>('Père');
+
+  const openCorriger = (r: RejetApiRow) => {
+    setCorrigerRow(r);
+    const e = r.enfant;
+    setFormPrenom(e.prenom);
+    setFormNom(e.nom);
+    const dn = (e.date_naissance || '').includes('T') ? e.date_naissance!.split('T')[0] : e.date_naissance || '';
+    setFormDn(dn);
+    setFormSexe(e.sexe === 'F' ? 'F' : 'M');
+    setFormLien(LIEN_API_TO_FR[e.lien_parente] || 'Autre');
+  };
+
+  const submitCorriger = async () => {
+    if (!token || !corrigerRow || !formPrenom.trim() || !formNom.trim() || !formDn) return;
+    setSaving(true);
+    try {
+      await apiRequest(`/admin/demandes/${corrigerRow.demande_id}/corriger-rejet`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          enfant_prenom: formPrenom.trim(),
+          enfant_nom: formNom.trim(),
+          enfant_date_naissance: formDn,
+          enfant_sexe: formSexe,
+          enfant_lien_parente: LIEN_FR_TO_API[formLien],
+        }),
+      });
+      toast({
+        title: 'Correction enregistrée',
+        description: `La demande a été remise en liste (${getListeLabelFromApi(corrigerRow.liste)}), en dernière position.`,
+      });
+      setCorrigerRow(null);
+      await load();
+    } catch {
+      toast({ title: 'Erreur', description: 'La correction n’a pas pu être enregistrée.', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const submitRefusDef = async () => {
+    if (!token || !refusDefRow) return;
+    setSaving(true);
+    try {
+      await apiRequest(`/admin/demandes/${refusDefRow.demande_id}/refus-definitif`, {
+        method: 'POST',
+        token,
+      });
+      toast({
+        title: 'Refus définitif',
+        description: `La demande de ${refusDefRow.enfant.prenom} ${refusDefRow.enfant.nom} est close définitivement.`,
+      });
+      setRefusDefRow(null);
+      await load();
+    } catch {
+      toast({ title: 'Erreur', description: 'Action impossible.', variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const renderTableAttenteCorrection = (rows: RejetApiRow[]) => (
+    <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            <TableHead className="font-semibold">Matricule</TableHead>
+            <TableHead className="font-semibold">Nom Parent</TableHead>
+            <TableHead className="font-semibold">Prénom Enfant</TableHead>
+            <TableHead className="font-semibold">Nom Enfant</TableHead>
+            <TableHead className="font-semibold">Âge</TableHead>
+            <TableHead className="font-semibold">Lien parenté</TableHead>
+            <TableHead className="font-semibold">Liste d&apos;origine</TableHead>
+            <TableHead className="font-semibold">Motif du refus</TableHead>
+            <TableHead className="font-semibold">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                Aucune entrée
+              </TableCell>
+            </TableRow>
+          ) : (
+            rows.map((r) => {
+              const dn = r.enfant.date_naissance?.includes('T')
+                ? r.enfant.date_naissance.split('T')[0]
+                : r.enfant.date_naissance || '';
+              const lien =
+                LIEN_API_TO_FR[r.enfant.lien_parente] || r.enfant.lien_parente || '—';
+              return (
+                <TableRow key={r.demande_id}>
+                  <TableCell className="font-mono text-sm">{r.parent_matricule}</TableCell>
+                  <TableCell className="text-sm">
+                    {[r.parent_nom, r.parent_prenom].filter(Boolean).join(' ') || '—'}
+                  </TableCell>
+                  <TableCell className="text-sm font-medium">{r.enfant.prenom}</TableCell>
+                  <TableCell className="text-sm">{r.enfant.nom}</TableCell>
+                  <TableCell>{dn ? `${calculateAge(dn)} ans` : '—'}</TableCell>
+                  <TableCell className="text-sm">{lien}</TableCell>
+                  <TableCell>
+                    <span className="text-xs font-medium px-2.5 py-1 rounded-md bg-muted text-muted-foreground">
+                      {getListeLabelFromApi(r.liste)}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-sm text-destructive max-w-[220px]">
+                    {(r.non_validation_reason || '').trim() || '—'}
+                  </TableCell>
+                  <TableCell className="align-middle whitespace-nowrap">
+                    <div className="flex flex-row flex-nowrap items-center justify-end gap-2 sm:justify-start">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="h-7 shrink-0 gap-1 rounded-full border-0 bg-[#00875A] px-2.5 text-[11px] leading-none font-medium !text-white shadow-none hover:bg-[#006b4a] focus-visible:ring-2 focus-visible:ring-[#00875A] focus-visible:ring-offset-1 [&_svg]:!size-3 [&_svg]:!text-white"
+                        onClick={() => openCorriger(r)}
+                      >
+                        <RotateCcw className="size-3 shrink-0" aria-hidden />
+                        Corriger
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        className="h-7 shrink-0 gap-1 rounded-full border-0 bg-[#C92A2A] px-2.5 text-[11px] leading-none font-medium !text-white shadow-none hover:bg-[#A82222] focus-visible:ring-2 focus-visible:ring-[#C92A2A] focus-visible:ring-offset-1 [&_svg]:!size-3 [&_svg]:!text-white"
+                        onClick={() => setRefusDefRow(r)}
+                      >
+                        <Ban className="size-3 shrink-0" aria-hidden />
+                        Refus définitif
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              );
+            })
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+
+  const renderTableDefinitifs = (rows: RejetApiRow[]) => (
+    <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
+      <Table>
+        <TableHeader>
+          <TableRow className="bg-muted/50">
+            <TableHead className="font-semibold">Liste d&apos;origine</TableHead>
+            <TableHead className="font-semibold">Matricule</TableHead>
+            <TableHead className="font-semibold">Parent</TableHead>
+            <TableHead className="font-semibold">Enfant</TableHead>
+            <TableHead className="font-semibold">Âge</TableHead>
+            <TableHead className="font-semibold">Motif du refus</TableHead>
+            <TableHead className="font-semibold">Statut liste</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                Aucune entrée
+              </TableCell>
+            </TableRow>
+          ) : (
+            rows.map((r) => {
+              const lu = listeApiToUi(r.liste) as ListeUi;
+              const dn = r.enfant.date_naissance?.includes('T')
+                ? r.enfant.date_naissance.split('T')[0]
+                : r.enfant.date_naissance || '';
+              return (
+                <TableRow key={r.demande_id}>
+                  <TableCell className="text-sm">{getListeLabelFromApi(r.liste)}</TableCell>
+                  <TableCell className="font-mono text-sm">{r.parent_matricule}</TableCell>
+                  <TableCell className="text-sm">
+                    {r.parent_prenom} {r.parent_nom}
+                  </TableCell>
+                  <TableCell className="text-sm font-medium">
+                    {r.enfant.prenom} {r.enfant.nom}
+                  </TableCell>
+                  <TableCell>{dn ? `${calculateAge(dn)} ans` : '—'}</TableCell>
+                  <TableCell className="text-sm text-destructive max-w-[220px]">
+                    {(r.non_validation_reason || '').trim() || '—'}
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
+                      {statutLabelFromListeUi(lu)}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              );
+            })
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-8">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
-          <ThumbsDown className="w-5 h-5 text-destructive" />
+          <Ban className="w-5 h-5 text-destructive" />
         </div>
         <div>
           <h1 className="text-2xl font-bold text-foreground">Demandes rejetées</h1>
           <p className="text-muted-foreground mt-1">
-            Demandes au statut informations non validées (consultation), depuis les trois listes.
+            {enAttente.length} demande(s) en attente de correction — {definitifs.length} refus définitif(s)
           </p>
         </div>
       </motion.div>
@@ -151,132 +349,148 @@ export default function ListeDemandesRejetees() {
       <div className="relative flex-1 min-w-[200px] max-w-md">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
         <Input
-          placeholder="Rechercher par matricule, nom, motif..."
+          placeholder="Rechercher..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="pl-9 rounded-lg"
         />
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-        className="rounded-xl border border-border bg-card shadow-card overflow-hidden"
-      >
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-muted/50">
-                <TableHead className="font-semibold">Liste d&apos;origine</TableHead>
-                <TableHead className="font-semibold">Rang</TableHead>
-                <TableHead className="font-semibold">Matricule</TableHead>
-                <TableHead className="font-semibold">Parent</TableHead>
-                <TableHead className="font-semibold">Enfant</TableHead>
-                <TableHead className="font-semibold">Âge</TableHead>
-                <TableHead className="font-semibold">Statut liste</TableHead>
-                <TableHead className="font-semibold">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
-                    Aucune demande rejetée
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filtered.map((e) => (
-                  <TableRow key={e.demandeId}>
-                    <TableCell className="text-sm">{getListeLabel(e.liste)}</TableCell>
-                    <TableCell className="text-center font-medium">{e.rang}</TableCell>
-                    <TableCell className="font-mono text-sm">{e.parentMatricule}</TableCell>
-                    <TableCell className="text-sm">
-                      {(e.parentPrenom || '') + ' ' + (e.parentNom || '')}
-                    </TableCell>
-                    <TableCell className="text-sm font-medium">
-                      {e.prenom} {e.nom}
-                    </TableCell>
-                    <TableCell>{calculateAge(e.dateNaissance)} ans</TableCell>
-                    <TableCell>
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground">{e.statut}</span>
-                    </TableCell>
-                    <TableCell>
-                      <Button size="sm" variant="ghost" onClick={() => setDetail(e)} className="gap-1 text-xs rounded-lg h-7 px-2">
-                        <Eye className="w-3 h-3" />
-                        Détails
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </motion.div>
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">Demandes en attente de correction</h2>
+        <p className="text-sm text-muted-foreground">
+          Corrections possibles par le gestionnaire ; réintégration dans la liste d&apos;origine en dernière position.
+        </p>
+        {renderTableAttenteCorrection(attF)}
+      </section>
 
-      <Dialog open={!!detail} onOpenChange={() => setDetail(null)}>
-        <DialogContent className="sm:max-w-lg rounded-xl">
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold text-foreground">Refus définitifs</h2>
+        <p className="text-sm text-muted-foreground">Demandes closes — plus aucune action pour le parent ni pour l&apos;administration.</p>
+        {renderTableDefinitifs(defF)}
+      </section>
+
+      <Dialog open={!!corrigerRow} onOpenChange={(o) => !o && setCorrigerRow(null)}>
+        <DialogContent className="sm:max-w-lg rounded-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-foreground">Détails — demande rejetée</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="w-5 h-5 text-emerald-600" />
+              Corriger la demande
+            </DialogTitle>
+            <DialogDescription>
+              Corrigez les informations de la demande de{' '}
+              <strong>
+                {corrigerRow?.enfant.prenom} {corrigerRow?.enfant.nom}
+              </strong>
+              , puis confirmez pour remettre dans{' '}
+              <strong>{corrigerRow ? getListeLabelFromApi(corrigerRow.liste) : '—'}</strong>.
+            </DialogDescription>
           </DialogHeader>
-          {detail && (
-            <div className="space-y-4 text-sm">
-              <span className="text-xs font-semibold px-3 py-1 rounded-full bg-destructive/10 text-destructive">Informations non validées</span>
-              {detail.motifRefus && (
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Motif :</span> {detail.motifRefus}
-                </p>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <h3 className="font-semibold border-b pb-1">Parent</h3>
-                  <div>
-                    <span className="text-muted-foreground">Matricule :</span>{' '}
-                    <span className="font-mono">{detail.parentMatricule}</span>
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Nom :</span> {detail.parentNom}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Prénom :</span> {detail.parentPrenom}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Service :</span> {detail.parentService}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Agence :</span> {detail.parentAgence || '—'}
-                  </div>
-                  <div>
-                    <span className="text-muted-foreground">Tél. :</span> {detail.parentTelephone || '—'}
-                  </div>
+          {corrigerRow && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-3 text-sm space-y-1">
+                <div>
+                  <span className="text-muted-foreground">Matricule :</span>{' '}
+                  <span className="font-mono">{corrigerRow.parent_matricule}</span>
                 </div>
-                <div className="space-y-2">
-                  <h3 className="font-semibold border-b pb-1">Enfant</h3>
+                <div>
+                  <span className="text-muted-foreground">Nom du parent :</span>{' '}
+                  {corrigerRow.parent_prenom} {corrigerRow.parent_nom}
+                </div>
+              </div>
+              <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 text-sm text-destructive">
+                Motif du refus : {corrigerRow.non_validation_reason?.trim() || '—'}
+              </div>
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Informations de l&apos;enfant (modifiable)
+                </p>
+                <div className="grid gap-3">
                   <div>
-                    <span className="text-muted-foreground">Nom :</span> {detail.nom}
+                    <Label htmlFor="cj-prenom">Prénom *</Label>
+                    <Input id="cj-prenom" value={formPrenom} onChange={(e) => setFormPrenom(e.target.value)} className="rounded-lg mt-1" />
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Prénom :</span> {detail.prenom}
+                    <Label htmlFor="cj-nom">Nom *</Label>
+                    <Input id="cj-nom" value={formNom} onChange={(e) => setFormNom(e.target.value)} className="rounded-lg mt-1" />
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Âge :</span> {calculateAge(detail.dateNaissance)} ans
+                    <Label htmlFor="cj-dn">Date de naissance *</Label>
+                    <Input id="cj-dn" type="date" value={formDn} onChange={(e) => setFormDn(e.target.value)} className="rounded-lg mt-1" />
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Liste d&apos;origine :</span> {getListeLabel(detail.liste)} (rang {detail.rang})
+                    <Label>Sexe *</Label>
+                    <Select value={formSexe} onValueChange={(v) => setFormSexe(v as 'M' | 'F')}>
+                      <SelectTrigger className="rounded-lg mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="M">Masculin</SelectItem>
+                        <SelectItem value="F">Féminin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Lien de parenté *</Label>
+                    <Select value={formLien} onValueChange={(v) => setFormLien(v as Enfant['lienParente'])}>
+                      <SelectTrigger className="rounded-lg mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Père">Père</SelectItem>
+                        <SelectItem value="Mère">Mère</SelectItem>
+                        <SelectItem value="Tuteur légal">Tuteur légal</SelectItem>
+                        <SelectItem value="Autre">Autre</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground pt-2 border-t">
-                Inscription :{' '}
-                {new Date(detail.dateInscription).toLocaleDateString('fr-FR', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
-              </p>
+              <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-sm text-emerald-900">
+                Destination : <strong>{getListeLabelFromApi(corrigerRow.liste)}</strong> — l&apos;enfant sera placé en{' '}
+                <strong>dernière position</strong> (dernier arrivé), selon l&apos;ordre des rangs en vigueur.
+              </div>
             </div>
           )}
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setCorrigerRow(null)} disabled={saving}>
+              Annuler
+            </Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={() => void submitCorriger()} disabled={saving}>
+              Confirmer la correction
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!refusDefRow} onOpenChange={(o) => !o && setRefusDefRow(null)}>
+        <DialogContent className="sm:max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Ban className="w-5 h-5" />
+              Refus définitif
+            </DialogTitle>
+            <DialogDescription className="text-left space-y-2 pt-2">
+              <p>
+                Vous êtes sur le point de <strong>refuser définitivement</strong> la demande de{' '}
+                <strong>
+                  {refusDefRow?.enfant.prenom} {refusDefRow?.enfant.nom}
+                </strong>
+                .
+              </p>
+              <p className="text-destructive font-medium text-sm">
+                Cette action est irréversible. Le parent ne pourra plus rien faire pour cette demande.
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setRefusDefRow(null)} disabled={saving}>
+              Annuler
+            </Button>
+            <Button variant="destructive" onClick={() => void submitRefusDef()} disabled={saving}>
+              Confirmer le refus définitif
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
