@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, RotateCcw, Ban } from 'lucide-react';
+import { Search, RotateCcw, Ban, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -79,6 +79,12 @@ function getListeLabelFromApi(code: string): string {
     default:
       return code;
   }
+}
+
+/** Passage vers Autre depuis Père / Mère / Tuteur légal : transfert liste N2 (aligné backend). */
+function correctionAfficheTransfertN2(formLien: Enfant['lienParente'], lienParenteApiOrigine: string): boolean {
+  if (formLien !== 'Autre') return false;
+  return ['PERE', 'MERE', 'TUTEUR_LEGAL'].includes(lienParenteApiOrigine);
 }
 
 const calculateAge = (dateNaissance: string): number => {
@@ -162,9 +168,12 @@ export default function ListeDemandesRejetees() {
           enfant_lien_parente: LIEN_FR_TO_API[formLien],
         }),
       });
+      const transfertN2 = correctionAfficheTransfertN2(formLien, corrigerRow.enfant.lien_parente);
       toast({
         title: 'Correction enregistrée',
-        description: `La demande a été remise en liste (${getListeLabelFromApi(corrigerRow.liste)}), en dernière position.`,
+        description: transfertN2
+          ? `La demande a été transférée en ${getListeLabelFromApi('ATTENTE_N2')}, en dernière position.`
+          : `La demande a été remise en liste (${getListeLabelFromApi(corrigerRow.liste)}), en dernière position.`,
       });
       setCorrigerRow(null);
       await load();
@@ -446,10 +455,23 @@ export default function ListeDemandesRejetees() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-sm text-emerald-900">
-                Destination : <strong>{getListeLabelFromApi(corrigerRow.liste)}</strong> — l&apos;enfant sera placé en{' '}
-                <strong>dernière position</strong> (dernier arrivé), selon l&apos;ordre des rangs en vigueur.
-              </div>
+              {correctionAfficheTransfertN2(formLien, corrigerRow.enfant.lien_parente) && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950 flex gap-3">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" aria-hidden />
+                  <div>
+                    <p className="font-semibold text-amber-900">Changement de liste</p>
+                    <p className="mt-1 text-amber-800">
+                      L&apos;enfant sera transféré dans la Liste d&apos;Attente N°2 en dernière position.
+                    </p>
+                  </div>
+                </div>
+              )}
+              {!correctionAfficheTransfertN2(formLien, corrigerRow.enfant.lien_parente) && (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3 text-sm text-emerald-900">
+                  Destination : <strong>{getListeLabelFromApi(corrigerRow.liste)}</strong> — l&apos;enfant sera placé en{' '}
+                  <strong>dernière position</strong> (dernier arrivé), selon l&apos;ordre des rangs en vigueur.
+                </div>
+              )}
             </div>
           )}
           <DialogFooter className="gap-2 sm:gap-0">

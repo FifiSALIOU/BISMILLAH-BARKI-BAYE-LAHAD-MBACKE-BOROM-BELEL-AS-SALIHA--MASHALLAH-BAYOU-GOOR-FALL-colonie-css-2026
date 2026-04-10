@@ -499,7 +499,11 @@ def admin_corriger_demande_rejetee(
     sexe: Sexe,
     lien_parente: LienParente,
 ) -> DemandeInscription:
-    """Remet une demande NON_VALIDEE (non définitive) en SOUMISE, après correction des infos enfant — rang via `_next_rang_for_liste`."""
+    """Remet une demande NON_VALIDEE (non définitive) en SOUMISE, après correction des infos enfant — rang via `_next_rang_for_liste`.
+
+    Si le lien passe de Père / Mère / Tuteur légal à Autre : la demande est affectée à la liste ATTENTE_N2
+    (même mécanisme de renumérotation que pour une correction sur la liste d'origine).
+    """
     demande = db.query(DemandeInscription).filter(DemandeInscription.id == demande_id).first()
     if not demande:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande introuvable.")
@@ -509,17 +513,37 @@ def admin_corriger_demande_rejetee(
             detail="Correction impossible : demande non concernée ou refus définitif.",
         )
     _validate_annee_naissance(date_naissance)
+    ensure_listes_exist(db)
     enfant = demande.enfant
+    ancien_lien = enfant.lien_parente
+    old_liste_id = int(demande.liste_id)
+    transfert_n2 = lien_parente == LienParente.AUTRE and ancien_lien in (
+        LienParente.PERE,
+        LienParente.MERE,
+        LienParente.TUTEUR_LEGAL,
+    )
+    liste_n2 = None
+    if transfert_n2:
+        liste_n2 = db.query(Liste).filter(Liste.code == ListeCode.ATTENTE_N2).first()
+        if not liste_n2:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste N2 introuvable.")
     enfant.prenom = (prenom or "").strip()[:191] or enfant.prenom
     enfant.nom = (nom or "").strip()[:191] or enfant.nom
     enfant.date_naissance = date_naissance
     enfant.sexe = sexe
     enfant.lien_parente = lien_parente
     enfant.updated_at = datetime.now(timezone.utc)
+    new_liste_id = old_liste_id
+    if transfert_n2:
+        new_liste_id = int(liste_n2.id)
+        demande.liste_id = liste_n2.id
     demande.statut = DemandeStatut.SOUMISE
     demande.non_validation_reason = ""
     demande.updated_at = datetime.now(timezone.utc)
     db.flush()
+    moved_liste = transfert_n2 and old_liste_id != new_liste_id
+    if moved_liste:
+        _next_rang_for_liste(db, old_liste_id)
     _next_rang_for_liste(db, int(demande.liste_id))
     db.refresh(demande)
     return demande
