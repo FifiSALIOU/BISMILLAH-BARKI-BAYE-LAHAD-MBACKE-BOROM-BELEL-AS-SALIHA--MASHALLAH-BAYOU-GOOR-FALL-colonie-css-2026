@@ -266,14 +266,17 @@ export default function GestionListe({ type }: Props) {
 
   const exportPDF = () => {
     const { headers, rows } = generateCSV();
+    // PDF : sans les colonnes « Informations » et « Désistement » (Excel / écran inchangés).
+    const pdfHeaders = headers.slice(0, -2);
+    const pdfRows = rows.map((r) => r.slice(0, -2));
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFontSize(16);
     doc.text(titles[type], 14, 15);
     doc.setFontSize(10);
     doc.text(`Total : ${enfantsOrdreArrivee.length} enfant(s)`, 14, 22);
     autoTable(doc, {
-      head: [headers],
-      body: rows.map(r => r.map(c => String(c))),
+      head: [pdfHeaders],
+      body: pdfRows.map((r) => r.map((c) => String(c))),
       startY: 28,
       styles: { fontSize: 8 },
       headStyles: { fillColor: [59, 130, 246] },
