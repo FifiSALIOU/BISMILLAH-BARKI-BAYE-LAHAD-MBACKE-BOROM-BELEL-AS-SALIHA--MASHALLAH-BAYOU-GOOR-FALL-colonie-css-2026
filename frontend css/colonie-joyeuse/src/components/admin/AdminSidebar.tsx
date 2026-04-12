@@ -118,6 +118,8 @@ export function AdminSidebar({ currentPage, onNavigate, isSuperAdmin }: Props) {
               </SidebarMenuItem>
               */}
 
+              {/*
+              Ancien emplacement « Sites » dans Principal (désormais sous Administration, après Utilisateurs).
               {isSuperAdmin && (
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => onNavigate('gestion_sites')} isActive={currentPage === 'gestion_sites'} tooltip="Sites">
@@ -125,6 +127,7 @@ export function AdminSidebar({ currentPage, onNavigate, isSuperAdmin }: Props) {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
+              */}
 
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={() => onNavigate('statistiques')} isActive={currentPage === 'statistiques'} tooltip="Statistiques">
@@ -204,6 +207,11 @@ export function AdminSidebar({ currentPage, onNavigate, isSuperAdmin }: Props) {
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => onNavigate('utilisateurs')} isActive={currentPage === 'utilisateurs'} tooltip="Utilisateurs">
                     <Users className="w-4 h-4" />{!collapsed && <span>Utilisateurs</span>}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={() => onNavigate('gestion_sites')} isActive={currentPage === 'gestion_sites'} tooltip="Sites">
+                    <MapPin className="w-4 h-4" />{!collapsed && <span>Sites</span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
