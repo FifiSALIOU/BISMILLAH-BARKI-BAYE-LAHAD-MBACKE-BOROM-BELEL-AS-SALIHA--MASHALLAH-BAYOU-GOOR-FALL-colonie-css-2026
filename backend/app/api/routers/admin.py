@@ -821,7 +821,14 @@ def stats_summary(
     total_users = db.query(func.count(User.id)).scalar() or 0
     total_parents = db.query(func.count(Parent.id)).scalar() or 0
     total_enfants = db.query(func.count(Enfant.id)).scalar() or 0
-    total_demandes = db.query(func.count(DemandeInscription.id)).scalar() or 0
+    # Aligné sur les écrans « Gestion des listes » : seules les demandes actives (SOUMISE / RETENUE).
+    actives = (DemandeStatut.SOUMISE, DemandeStatut.RETENUE)
+    total_demandes = (
+        db.query(func.count(DemandeInscription.id))
+        .filter(DemandeInscription.statut.in_(actives))
+        .scalar()
+        or 0
+    )
 
     liste_finale_ordered = demandes_liste_finale_retenus_si_cloturees(db)
     if liste_finale_ordered is None:
@@ -840,6 +847,7 @@ def stats_summary(
     inscriptions_rows = (
         db.query(Liste.code, func.count(DemandeInscription.id))
         .join(DemandeInscription, DemandeInscription.liste_id == Liste.id)
+        .filter(DemandeInscription.statut.in_(actives))
         .group_by(Liste.code)
         .all()
     )
@@ -855,6 +863,7 @@ def stats_summary(
     recent_demandes = (
         db.query(DemandeInscription)
         .options(joinedload(DemandeInscription.enfant).joinedload(Enfant.parent), joinedload(DemandeInscription.liste))
+        .filter(DemandeInscription.statut.in_(actives))
         .order_by(
             DemandeInscription.updated_at.desc().nulls_last(),
             DemandeInscription.date_inscription.desc(),
