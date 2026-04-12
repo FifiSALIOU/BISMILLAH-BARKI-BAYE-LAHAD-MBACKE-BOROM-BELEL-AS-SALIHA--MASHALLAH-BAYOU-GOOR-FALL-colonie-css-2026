@@ -16,24 +16,26 @@ export default function Statistiques() {
 
   useEffect(() => {
     if (!token) return;
+    // `/admin/users` est réservé au super admin : ne pas l’inclure ici (sinon échec total pour le gestionnaire).
     Promise.all([
       apiRequest('/admin/stats', { token }),
-      apiRequest<any[]>('/admin/users', { token }),
       apiRequest<any[]>(`/admin/listes/${listeUiToApi('principale')}/demandes`, { token }),
       apiRequest<any[]>(`/admin/listes/${listeUiToApi('attente_n1')}/demandes`, { token }),
       apiRequest<any[]>(`/admin/listes/${listeUiToApi('attente_n2')}/demandes`, { token }),
     ])
-      .then(([stats, users, principaleRows, n1Rows, n2Rows]) => {
+      .then(([stats, principaleRows, n1Rows, n2Rows]) => {
         setStatsApi(stats);
+        const all = [...principaleRows, ...n1Rows, ...n2Rows];
         const byService: Record<string, number> = {};
-        users.filter((u) => u.role === 'PARENT').forEach((u) => {
-          const s = u.parent_service || 'Non défini';
+        all.forEach((r) => {
+          const s = (r?.parent_service as string | undefined)?.trim() || 'Non défini';
           byService[s] = (byService[s] || 0) + 1;
         });
         setServiceStats(byService);
-        const all = [...principaleRows, ...n1Rows, ...n2Rows];
-        setGarcons(all.filter((r) => r?.enfant?.sexe === 'M').length);
-        setFilles(all.filter((r) => r?.enfant?.sexe === 'F').length);
+        const isM = (sexe: unknown) => sexe === 'M' || sexe === 'MASCULIN';
+        const isF = (sexe: unknown) => sexe === 'F' || sexe === 'FEMININ';
+        setGarcons(all.filter((r) => isM(r?.enfant?.sexe)).length);
+        setFilles(all.filter((r) => isF(r?.enfant?.sexe)).length);
       })
       .catch(() => undefined);
   }, [token]);
