@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useInscription } from '@/contexts/InscriptionContext';
-import { Users, UserCheck, Clock, TrendingUp, Award, HandMetal, RefreshCw } from 'lucide-react';
+import { Users, UserCheck, Clock, TrendingUp, Award, HandMetal } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/lib/api';
-import { Button } from '@/components/ui/button';
 
 type RecentActivityRow = {
   id: string;
@@ -20,18 +19,14 @@ export default function AdminDashboard() {
   const { enfants, settings } = useInscription();
   const { token } = useAuth();
   const [statsApi, setStatsApi] = useState<any>(null);
-  const [statsLoading, setStatsLoading] = useState(false);
 
   const loadStats = useCallback(async () => {
     if (!token) return;
-    setStatsLoading(true);
     try {
       const data = await apiRequest('/admin/stats', { token });
       setStatsApi(data);
     } catch {
       /* ignore */
-    } finally {
-      setStatsLoading(false);
     }
   }, [token]);
 
@@ -99,22 +94,15 @@ export default function AdminDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <div>
           <h1 className="text-2xl font-bold text-foreground">Tableau de bord</h1>
           <p className="text-muted-foreground mt-1">Vue d'ensemble — Colonie de Vacances 2026</p>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="shrink-0 gap-2"
-          disabled={statsLoading || !token}
-          onClick={() => void loadStats()}
-        >
-          <RefreshCw className={`w-4 h-4 ${statsLoading ? 'animate-spin' : ''}`} />
-          Actualiser
-        </Button>
+        {/*
+        Ancien emplacement : bouton « Actualiser » (gestionnaire + super admin, puis super admin seul).
+        <Button variant="outline" size="sm" onClick={() => void loadStats()}>…</Button>
+        */}
       </motion.div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
