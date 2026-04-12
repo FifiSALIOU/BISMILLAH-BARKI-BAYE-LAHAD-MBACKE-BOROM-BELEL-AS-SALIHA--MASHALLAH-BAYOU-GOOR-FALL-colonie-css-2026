@@ -4,7 +4,7 @@ import {
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, FileText, List, BarChart3, Users, Settings, ChevronDown, /* Award, */ UserCheck, History, Database, ListChecks, MapPin, MessageSquare, Briefcase } from 'lucide-react';
+import { LayoutDashboard, FileText, List, BarChart3, Users, Settings, ChevronDown, /* Award, */ History, Database, ListChecks, MapPin, Briefcase } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import logo from '@/assets/logo.png';
 
@@ -224,6 +224,7 @@ export function AdminSidebar({ currentPage, onNavigate, isSuperAdmin }: Props) {
                     <MapPin className="w-4 h-4" />{!collapsed && <span>Sites</span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                {/*
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => onNavigate('parents_list')} isActive={currentPage === 'parents_list'} tooltip="Envoie Mails">
                     <UserCheck className="w-4 h-4" />{!collapsed && <span>Envoie Mails</span>}
@@ -234,6 +235,7 @@ export function AdminSidebar({ currentPage, onNavigate, isSuperAdmin }: Props) {
                     <MessageSquare className="w-4 h-4" />{!collapsed && <span>Envoie SMS</span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
+                */}
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => onNavigate('statistiques')} isActive={currentPage === 'statistiques'} tooltip="Statistiques">
                     <BarChart3 className="w-4 h-4" />{!collapsed && <span>Statistiques</span>}
