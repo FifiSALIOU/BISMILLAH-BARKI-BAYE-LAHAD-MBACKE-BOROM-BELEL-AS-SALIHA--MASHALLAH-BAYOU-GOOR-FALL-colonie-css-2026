@@ -1,4 +1,5 @@
 import type { Enfant, Parent } from '@/data/mockData';
+import { listeApiToUi, statutLabelFromListeUi } from '@/lib/listeCodes';
 
 /** Réponse `GET /parent/demandes` (DemandeOut) */
 export type DemandeOutApi = {
@@ -73,10 +74,9 @@ function listeFromCode(code: string): Enfant['liste'] {
   return 'attente_n2';
 }
 
-function statutFromDemande(d: { liste_code: string; enfant_is_titulaire: boolean }): Enfant['statut'] {
-  if (d.enfant_is_titulaire) return 'Titulaire';
-  if (d.liste_code === 'ATTENTE_N1') return 'Suppléant N1';
-  return 'Suppléant N2';
+/** Libellé de statut comme à l’écran « Gestion des listes » (dérivé de `liste_code`). */
+function statutFromDemande(d: { liste_code: string }): Enfant['statut'] {
+  return statutLabelFromListeUi(listeApiToUi(d.liste_code));
 }
 
 function validationFromStatut(statut: string, nonValidationReason?: string | null): {
@@ -194,10 +194,7 @@ export function mapListeFinaleRowToEnfant(row: ListeFinaleRowApi): Enfant {
     sexe,
     lienParente: 'Père',
     liste: listeFromCode(row.liste_code),
-    statut: statutFromDemande({
-      liste_code: row.liste_code,
-      enfant_is_titulaire: row.liste_code === 'PRINCIPALE',
-    }),
+    statut: statutFromDemande({ liste_code: row.liste_code }),
     dateInscription,
     validation: 'validé',
   };
