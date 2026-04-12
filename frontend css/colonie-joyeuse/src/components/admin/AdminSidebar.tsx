@@ -130,20 +130,13 @@ export function AdminSidebar({ currentPage, onNavigate, isSuperAdmin }: Props) {
               */}
 
               {/*
-              Ancien emplacement « Statistiques » pour tous les rôles (super admin : désormais sous Administration, après Envoie SMS).
+              Ancien emplacement « Statistiques » (gestionnaire : désormais après « Historique » ; super admin : Administration).
               <SidebarMenuItem>
                 <SidebarMenuButton onClick={() => onNavigate('statistiques')} isActive={currentPage === 'statistiques'} tooltip="Statistiques">
                   <BarChart3 className="w-4 h-4" />{!collapsed && <span>Statistiques</span>}
                 </SidebarMenuButton>
               </SidebarMenuItem>
               */}
-              {!isSuperAdmin && (
-                <SidebarMenuItem>
-                  <SidebarMenuButton onClick={() => onNavigate('statistiques')} isActive={currentPage === 'statistiques'} tooltip="Statistiques">
-                    <BarChart3 className="w-4 h-4" />{!collapsed && <span>Statistiques</span>}
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              )}
 
               {/* Ancien menu : entrée unique « Historique » (sans sous-section).
               <SidebarMenuItem>
@@ -192,6 +185,13 @@ export function AdminSidebar({ currentPage, onNavigate, isSuperAdmin }: Props) {
                     tooltip="Historique — Demandes désistées / rejetées / Journal des actions"
                   >
                     <History className="w-4 h-4" />
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              )}
+              {!isSuperAdmin && (
+                <SidebarMenuItem>
+                  <SidebarMenuButton onClick={() => onNavigate('statistiques')} isActive={currentPage === 'statistiques'} tooltip="Statistiques">
+                    <BarChart3 className="w-4 h-4" />{!collapsed && <span>Statistiques</span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}
