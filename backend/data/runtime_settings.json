@@ -4,12 +4,12 @@
   "dateFinInscriptions": "2026-01-30",
   "dateDebutColonie": "2026-07-01",
   "dateFinColonie": "",
-  "capaciteMax": 12,
+  "capaciteMax": 19,
   "maxEnfantsParParent": 2,
   "ageMin": 2012,
   "ageMax": 2019,
   "inscriptionsOuvertes": true,
   "accesParentsActif": true,
-  "listeFinalePretePourValidation": true,
+  "listeFinalePretePourValidation": false,
   "listeFinaleValideeDefinitive": true
 }

@@ -136,13 +136,16 @@ def liste_finale_globale_parent(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.PARENT)),
 ):
-    """Liste finale globale (lecture seule), publiée seulement après clôture des inscriptions."""
+    """Liste finale globale (lecture seule) : visible aux parents seulement après validation définitive par l'admin (et clôture des inscriptions)."""
     _ = user
     ensure_listes_exist(db)
     definitive = liste_finale_definitive_validee()
     ordered = demandes_liste_finale_retenus_si_cloturees(db)
     if ordered is None:
         return {"disponible": False, "retenus": [], "liste_finale_definitive": definitive}
+
+    if not definitive:
+        return {"disponible": False, "retenus": [], "liste_finale_definitive": False}
 
     out = []
     for idx, d in enumerate(ordered, start=1):
