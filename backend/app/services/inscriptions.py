@@ -545,6 +545,8 @@ def admin_corriger_demande_rejetee(
     if transfert_n2:
         new_liste_id = int(liste_n2.id)
         demande.liste_id = liste_n2.id
+        # Comme `POST .../transfer` vers une liste autre que PRINCIPALE : l’enfant n’est plus titulaire.
+        enfant.is_titulaire = False
     demande.statut = DemandeStatut.SOUMISE
     demande.non_validation_reason = ""
     demande.updated_at = datetime.now(timezone.utc)
