@@ -17,6 +17,7 @@ import Historique from '@/components/admin/Historique';
 import JournalLogs from '@/components/admin/JournalLogs';
 import GestionListesConfig from '@/components/admin/GestionListesConfig';
 import GestionSites from '@/components/admin/GestionSites';
+import GestionServices from '@/components/admin/GestionServices';
 import logo from '@/assets/logo.png';
 import { LogOut } from 'lucide-react';
 
@@ -58,6 +59,7 @@ export default function AdminLayout({ initialPage }: Props) {
     journal_logs: '/dashboard/admin/journal',
     parametres: '/dashboard/admin/parametres',
     gestion_listes_config: '/dashboard/admin/listes',
+    gestion_services: '/dashboard/admin/services',
     gestion_sites: '/dashboard/admin/sites',
   };
 
@@ -84,6 +86,7 @@ export default function AdminLayout({ initialPage }: Props) {
       case 'journal_logs': return isSuperAdmin ? <JournalLogs /> : <AdminDashboard />;
       case 'parametres': return isSuperAdmin ? <Parametres /> : <AdminDashboard />;
       case 'gestion_listes_config': return isSuperAdmin ? <GestionListesConfig /> : <AdminDashboard />;
+      case 'gestion_services': return isSuperAdmin ? <GestionServices /> : <AdminDashboard />;
       case 'gestion_sites': return isSuperAdmin ? <GestionSites /> : <AdminDashboard />;
       default: return <AdminDashboard />;
     }

@@ -43,6 +43,7 @@ const App = () => (
               <Route path="/dashboard/admin/journal" element={<Index page="journal_logs" />} />
               <Route path="/dashboard/admin/parametres" element={<Index page="parametres" />} />
               <Route path="/dashboard/admin/listes" element={<Index page="gestion_listes_config" />} />
+              <Route path="/dashboard/admin/services" element={<Index page="gestion_services" />} />
               <Route path="/dashboard/admin/sites" element={<Index page="gestion_sites" />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
