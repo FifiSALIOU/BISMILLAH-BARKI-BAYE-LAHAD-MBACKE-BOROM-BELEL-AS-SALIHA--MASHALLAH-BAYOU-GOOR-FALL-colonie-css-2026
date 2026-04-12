@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
+import { toast } from '@/hooks/use-toast';
 import InscrireEnfant from '@/components/parent/InscrireEnfant';
 import ListeFinaleParent from '@/components/parent/ListeFinaleParent';
 
@@ -39,6 +40,8 @@ export default function ParentDashboard() {
   const [listeFinaleApiParents, setListeFinaleApiParents] = useState<Parent[]>([]);
   /** Aligné sur le serveur : liste finale publiée seulement après clôture des inscriptions. */
   const [listeFinaleApiPubliee, setListeFinaleApiPubliee] = useState(false);
+  /** Après validation définitive par le gestionnaire : actions de désistement / titulaire bloquées côté API. */
+  const [listeFinaleDefinitiveApi, setListeFinaleDefinitiveApi] = useState(false);
 
   const loadAll = useCallback(async () => {
     if (!token || !parent) return;
@@ -53,13 +56,19 @@ export default function ParentDashboard() {
       setTransparenceParents(parentsFromTransparence(rows));
 
       try {
-        const finaleRes = await apiRequest<{ disponible: boolean; retenus: ListeFinaleRowApi[] }>('/parent/liste-finale', { token });
+        const finaleRes = await apiRequest<{
+          disponible: boolean;
+          retenus: ListeFinaleRowApi[];
+          liste_finale_definitive?: boolean;
+        }>('/parent/liste-finale', { token });
         const fin = finaleRes?.retenus ?? [];
         setListeFinaleApiPubliee(!!finaleRes?.disponible);
+        setListeFinaleDefinitiveApi(!!finaleRes?.liste_finale_definitive);
         setListeFinaleApiEnfants(fin.map(mapListeFinaleRowToEnfant));
         setListeFinaleApiParents(parentsFromListeFinale(fin));
       } catch {
         setListeFinaleApiPubliee(false);
+        setListeFinaleDefinitiveApi(false);
         setListeFinaleApiEnfants([]);
         setListeFinaleApiParents([]);
       }
@@ -165,6 +174,8 @@ export default function ParentDashboard() {
       await loadAll();
       addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Changement titulaire', details: `A défini ${selectedName} comme titulaire`, cible: selectedName });
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Action impossible';
+      toast({ title: 'Action impossible', description: msg, variant: 'destructive' });
       console.error(err);
     }
     setConfirmOpen(false);
@@ -185,6 +196,8 @@ export default function ParentDashboard() {
       await loadAll();
       addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Changement titulaire', details: `A défini ${enfantN1.prenom} ${enfantN1.nom} comme titulaire avant désistement`, cible: `${enfantN1.prenom} ${enfantN1.nom}` });
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Action impossible';
+      toast({ title: 'Action impossible', description: msg, variant: 'destructive' });
       console.error(err);
     }
   };
@@ -206,6 +219,8 @@ export default function ParentDashboard() {
         cible: desistementName,
       });
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Action impossible';
+      toast({ title: 'Action impossible', description: msg, variant: 'destructive' });
       console.error(err);
     }
     setDesistementOpen(false);
@@ -220,6 +235,8 @@ export default function ParentDashboard() {
       await loadAll();
       addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Annulation désistement', details: `A annulé le désistement de ${enfant?.prenom} ${enfant?.nom}`, cible: `${enfant?.prenom} ${enfant?.nom}` });
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Action impossible';
+      toast({ title: 'Action impossible', description: msg, variant: 'destructive' });
       console.error(err);
     }
   };
@@ -232,6 +249,8 @@ export default function ParentDashboard() {
       await loadAll();
       addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Réinscription', details: `A réinscrit ${reinscireName} après désistement`, cible: reinscireName });
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Action impossible';
+      toast({ title: 'Action impossible', description: msg, variant: 'destructive' });
       console.error(err);
     }
     setReinscrireOpen(false);
@@ -548,22 +567,22 @@ export default function ParentDashboard() {
 
                   {/* Action buttons */}
                   <div className="flex gap-2 mt-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                    {!inscriptionsCloturees && slot.enfant.statut !== 'Titulaire' && slot.enfant.lienParente !== 'Autre' && !slot.enfant.desistement && !slot.enfant.rejetDefinitif && (
+                    {!inscriptionsCloturees && slot.enfant.statut !== 'Titulaire' && slot.enfant.lienParente !== 'Autre' && !slot.enfant.desistement && !slot.enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <Button variant="outline" size="sm" onClick={() => handleSetTitulaire(slot.enfant!.id, `${slot.enfant!.prenom} ${slot.enfant!.nom}`)} className="rounded-lg gap-1 text-xs">
                         <ArrowUpDown className="w-3 h-3" />Définir titulaire
                       </Button>
                     )}
-                    {!slot.enfant.desistement && slot.enfant.validation !== 'refusé' && !slot.enfant.rejetDefinitif && (
+                    {!slot.enfant.desistement && slot.enfant.validation !== 'refusé' && !slot.enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <Button variant="outline" size="sm" onClick={() => handleDesistement(slot.enfant!.id, `${slot.enfant!.prenom} ${slot.enfant!.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
                         <HandMetal className="w-3 h-3" />Désistement
                       </Button>
                     )}
-                    {slot.enfant.desistement === 'demandé' && !slot.enfant.rejetDefinitif && (
+                    {slot.enfant.desistement === 'demandé' && !slot.enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <Button variant="outline" size="sm" onClick={() => handleAnnulerDesistement(slot.enfant!.id)} className="rounded-lg gap-1 text-xs text-amber-700 border-amber-300 hover:bg-amber-50">
                         <XCircle className="w-3 h-3" />Annuler désistement
                       </Button>
                     )}
-                    {!inscriptionsCloturees && slot.enfant.desistement === 'validé' && !slot.enfant.rejetDefinitif && (
+                    {!inscriptionsCloturees && slot.enfant.desistement === 'validé' && !slot.enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <Button variant="outline" size="sm" onClick={() => handleReinscrire(slot.enfant!.id, `${slot.enfant!.prenom} ${slot.enfant!.nom}`)} className="rounded-lg gap-1 text-xs hover:bg-accent hover:text-white hover:border-accent">
                         <RotateCcw className="w-3 h-3" />Réinscrire
                       </Button>

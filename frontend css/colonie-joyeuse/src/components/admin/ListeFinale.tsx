@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileDown, Search, Filter, Eye, Award, CheckCircle2, HandMetal, AlertTriangle, Sparkles } from 'lucide-react';
+import { FileDown, Search, Filter, Eye, Award, CheckCircle2, HandMetal, AlertTriangle, Sparkles, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -79,6 +79,9 @@ export default function ListeFinale() {
   const [enfantsDesistes, setEnfantsDesistes] = useState<Enfant[]>([]);
   const [settings, setSettings] = useState<any>({ capaciteMax: null, dateFinInscriptions: null });
   const [listeFinaleGeneree, setListeFinaleGeneree] = useState(false);
+  const [listeFinaleValideeDefinitive, setListeFinaleValideeDefinitive] = useState(false);
+  const [validerDefinitifLoading, setValiderDefinitifLoading] = useState(false);
+  const [confirmValidationDefinitiveOpen, setConfirmValidationDefinitiveOpen] = useState(false);
   const [desistementsByDemande, setDesistementsByDemande] = useState<Record<number, number>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [filterSexe, setFilterSexe] = useState<string>('all');
@@ -108,9 +111,12 @@ export default function ListeFinale() {
         setEnfantsRetenus([]);
         setEnfantsDesistes([]);
         setListeFinaleGeneree(false);
+        setListeFinaleValideeDefinitive(false);
         setDesistementsByDemande({});
         return;
       }
+      setListeFinaleGeneree(!!cfg?.listeFinalePretePourValidation);
+      setListeFinaleValideeDefinitive(!!cfg?.listeFinaleValideeDefinitive);
       const mapRows = (list: any[]): Enfant[] =>
         list.map((d: any) => {
           const lu = listeApiToUi(d.liste);
@@ -165,7 +171,6 @@ export default function ListeFinale() {
       }));
       setEnfantsDesistes([...desistesValides, ...pending].sort(sortOrdreListeFinale));
 
-      setListeFinaleGeneree(true);
       const idx: Record<number, number> = {};
       desistements.forEach((x) => {
         idx[x.demande_id] = x.desistement_id;
@@ -244,10 +249,35 @@ export default function ListeFinale() {
     }
   };
 
-  const handleGenererListe = () => {
-    if (!inscriptionsCloturees || listeFinaleGeneree) return;
-    setListeFinaleGeneree(true);
-    toast({ title: '✅ Liste finale générée', description: 'La liste finale a été générée automatiquement selon la priorité Principale > N1 > N2.' });
+  const handleGenererListe = async () => {
+    if (!inscriptionsCloturees || listeFinaleGeneree || listeFinaleValideeDefinitive) return;
+    try {
+      await apiRequest('/admin/liste-finale/confirmer-generation', { method: 'POST', token });
+      setListeFinaleGeneree(true);
+      toast({ title: '✅ Liste finale générée', description: 'La liste finale a été enregistrée selon la priorité Principale > N1 > N2. Vous pouvez valider définitivement lorsque vous le souhaitez.' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+      toast({ title: 'Échec', description: msg, variant: 'destructive' });
+    }
+  };
+
+  const handleValiderListeDefinitive = async () => {
+    if (!inscriptionsCloturees || listeFinaleValideeDefinitive || validerDefinitifLoading) return;
+    setValiderDefinitifLoading(true);
+    try {
+      await apiRequest('/admin/liste-finale/valider-definitive', { method: 'POST', token });
+      setListeFinaleValideeDefinitive(true);
+      setConfirmValidationDefinitiveOpen(false);
+      toast({
+        title: 'Liste finale validée définitivement',
+        description: 'Aucune modification des listes ni désistement parent ne sera possible. Les parents voient un message s’ils tentent une action.',
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+      toast({ title: 'Échec', description: msg, variant: 'destructive' });
+    } finally {
+      setValiderDefinitifLoading(false);
+    }
   };
 
   const exportList = (list: Enfant[], filename: string, format: 'csv' | 'pdf', isDesistes = false) => {
@@ -377,13 +407,22 @@ export default function ListeFinale() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <Button
-            onClick={handleGenererListe}
-            disabled={!inscriptionsCloturees || listeFinaleGeneree}
+            onClick={() => void handleGenererListe()}
+            disabled={!inscriptionsCloturees || listeFinaleGeneree || listeFinaleValideeDefinitive}
             className="gap-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-50 disabled:pointer-events-none"
           >
               <Sparkles className="w-4 h-4" />Générer la liste finale
+          </Button>
+          <Button
+            type="button"
+            onClick={() => setConfirmValidationDefinitiveOpen(true)}
+            disabled={!inscriptionsCloturees || listeFinaleValideeDefinitive || validerDefinitifLoading}
+            className="gap-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white disabled:opacity-50 disabled:pointer-events-none"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            {listeFinaleValideeDefinitive ? 'Liste validée définitivement' : 'Validation de la liste finale'}
           </Button>
           <Button onClick={() => handleHeaderExport('csv')} variant="outline" className="gap-2 rounded-lg" disabled={!inscriptionsCloturees}><FileDown className="w-4 h-4" />Export Excel</Button>
           <Button onClick={() => handleHeaderExport('pdf')} variant="outline" className="gap-2 rounded-lg" disabled={!inscriptionsCloturees}><FileDown className="w-4 h-4" />Export PDF</Button>
@@ -395,9 +434,15 @@ export default function ListeFinale() {
         <strong>ℹ️ Liste automatique :</strong> Après la <strong>clôture des inscriptions</strong>, l&apos;ordre est : <strong>Liste Principale</strong> (tous les rangs 1, 2…), puis <strong>Liste N°1</strong>, puis <strong>Liste N°2</strong>, en suivant le <strong>rang dans chaque liste</strong> (comme à l&apos;écran « Gestion des listes »), pas la seule date d&apos;inscription — celle-ci peut changer après transfert ou réinscription. Les désistements validés sont exclus ; les places libres sont comblées selon cet ordre jusqu&apos;à la capacité.
       </motion.div>
 
+      {listeFinaleValideeDefinitive && (
+        <div className="bg-slate-100 border border-slate-300 rounded-lg p-3 text-sm text-slate-800">
+          <strong>Liste finale figée :</strong> la validation définitive est enregistrée. Les transferts, échanges de rangs, désistements et validations de conformité sont désactivés côté gestionnaire.
+        </div>
+      )}
+
       {!inscriptionsCloturees && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-          Aucun enfant n&apos;apparaît ici tant que les inscriptions sont ouvertes. Après la date de fin configurée, la liste des retenus sera calculée automatiquement (priorité Principale, puis N°1, puis N°2, dans la limite des places). Le bouton <strong>Générer la liste finale</strong> sert à confirmer l&apos;étape une fois la période close.
+          Aucun enfant n&apos;apparaît ici tant que les inscriptions sont ouvertes. Après la date de fin configurée, la liste des retenus est calculée automatiquement (priorité Principale, puis N°1, puis N°2, dans la limite des places). Vous pouvez <strong>valider définitivement</strong> dès la clôture. Le bouton <strong>Générer la liste finale</strong> est optionnel (confirmation d&apos;étape).
         </div>
       )}
 
@@ -463,7 +508,7 @@ export default function ListeFinale() {
             </div>
           )}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-xl shadow-card border border-border">
-            {renderTable(filteredDesistes, true, true)}
+            {renderTable(filteredDesistes, !listeFinaleValideeDefinitive, true)}
           </motion.div>
         </TabsContent>
       </Tabs>
@@ -504,6 +549,57 @@ export default function ListeFinale() {
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirmation validation définitive de la liste finale */}
+      <Dialog open={confirmValidationDefinitiveOpen} onOpenChange={(open) => !validerDefinitifLoading && setConfirmValidationDefinitiveOpen(open)}>
+        <DialogContent className="sm:max-w-lg rounded-xl p-0 gap-0 overflow-hidden border-border shadow-lg">
+          <DialogHeader className="px-6 pt-6 pb-2 space-y-0">
+            <div className="flex items-start gap-3">
+              <div className="w-11 h-11 shrink-0 rounded-xl bg-primary/10 flex items-center justify-center">
+                <ShieldCheck className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0 pt-0.5">
+                <DialogTitle className="text-lg font-semibold text-foreground text-left">Validation définitive</DialogTitle>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="px-6 pb-2 space-y-4 text-sm text-muted-foreground">
+            <p className="text-foreground/90">
+              Vous êtes sur le point de <strong className="text-foreground font-semibold">valider définitivement</strong> la liste finale.
+            </p>
+            <div className="rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-3">
+              <p className="flex items-center gap-2 text-destructive font-semibold text-sm mb-2">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                Cette action est irréversible :
+              </p>
+              <ul className="list-disc pl-5 space-y-1.5 text-foreground/85 text-sm">
+                <li>Aucune modification ne sera plus possible sur la liste finale</li>
+                <li>Les parents pourront consulter la liste finale</li>
+                <li>Les désistements ne seront plus possibles par les parents</li>
+              </ul>
+            </div>
+          </div>
+          <DialogFooter className="px-6 py-4 bg-muted/30 border-t border-border flex-row justify-end gap-2 sm:gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="rounded-lg"
+              disabled={validerDefinitifLoading}
+              onClick={() => setConfirmValidationDefinitiveOpen(false)}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="button"
+              className="rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 min-w-[180px]"
+              disabled={validerDefinitifLoading}
+              onClick={() => void handleValiderListeDefinitive()}
+            >
+              {validerDefinitifLoading ? 'Validation…' : 'Valider définitivement'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

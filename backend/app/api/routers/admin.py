@@ -28,7 +28,8 @@ from app.services.inscriptions import (
     resequence_rangs_apres_desistement_valide,
     _next_rang_for_liste,
 )
-from app.services.liste_finale_compute import demandes_liste_finale_retenus_si_cloturees
+from app.services.liste_finale_compute import demandes_liste_finale_retenus_si_cloturees, inscriptions_cloturees
+from app.services.liste_finale_lock import raise_if_liste_finale_definitive
 from app.services.notify_helpers import collect_admin_emails
 from app.services.runtime_settings_store import merge_with_defaults, read_settings, write_settings
 
@@ -93,11 +94,44 @@ class ServiceConfigIn(BaseModel):
 
 
 def _default_runtime_settings() -> dict:
-    return RuntimeSettingsIn().model_dump()
+    d = RuntimeSettingsIn().model_dump()
+    d["listeFinalePretePourValidation"] = False
+    d["listeFinaleValideeDefinitive"] = False
+    return d
 
 
 def _read_runtime_settings() -> dict:
     return merge_with_defaults(_default_runtime_settings())
+
+
+def _liste_finale_reset_si_parametres_cles_changes(prev: dict, incoming: dict) -> bool:
+    """True si capacité max, max enfants / parent ou dates d’inscription ont changé — réinitialise le cycle liste finale."""
+    keys = ("capaciteMax", "maxEnfantsParParent", "dateDebutInscriptions", "dateFinInscriptions")
+
+    def _norm_date(v: object) -> str:
+        s = str(v or "").strip()
+        return s.split("T")[0] if s else ""
+
+    def _norm_cap(v: object) -> object:
+        if v is None:
+            return None
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return v
+
+    for k in keys:
+        a, b = prev.get(k), incoming.get(k)
+        if k in ("dateDebutInscriptions", "dateFinInscriptions"):
+            if _norm_date(a) != _norm_date(b):
+                return True
+        elif k == "capaciteMax":
+            if _norm_cap(a) != _norm_cap(b):
+                return True
+        elif k == "maxEnfantsParParent":
+            if _norm_cap(a) != _norm_cap(b):
+                return True
+    return False
 
 
 @router.get("/settings")
@@ -118,10 +152,56 @@ def update_runtime_settings(
     _ = db, user
     data = payload.model_dump()
     defaults = _default_runtime_settings()
+    prev = read_settings()
     # Fusionner avec le fichier existant pour ne pas perdre de clés futures / hors modèle.
-    merged = {**defaults, **read_settings(), **data}
+    merged = {**defaults, **prev, **data}
+    if _liste_finale_reset_si_parametres_cles_changes(prev, data):
+        merged["listeFinaleValideeDefinitive"] = False
+        merged["listeFinalePretePourValidation"] = False
     write_settings(merged)
     return merge_with_defaults(defaults)
+
+
+@router.post("/liste-finale/confirmer-generation", summary="Marque l’étape « liste générée » (après clôture)")
+def confirmer_generation_liste_finale(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
+):
+    """Optionnel : marque explicitement l’étape « liste générée » (la validation définitive ne dépend plus de cet appel)."""
+    _ = db, user
+    if not inscriptions_cloturees():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Les inscriptions ne sont pas encore clôturées.",
+        )
+    raise_if_liste_finale_definitive()
+    merged = {**_default_runtime_settings(), **read_settings()}
+    merged["listeFinalePretePourValidation"] = True
+    write_settings(merged)
+    return {"ok": True, "listeFinalePretePourValidation": True}
+
+
+@router.post("/liste-finale/valider-definitive", summary="Valide définitivement la liste finale (verrouillage)")
+def valider_liste_finale_definitive(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
+):
+    _ = db, user
+    if not inscriptions_cloturees():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Les inscriptions ne sont pas encore clôturées.",
+        )
+    rs = read_settings()
+    if rs.get("listeFinaleValideeDefinitive"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="La liste finale est déjà validée définitivement.",
+        )
+    merged = {**_default_runtime_settings(), **rs}
+    merged["listeFinaleValideeDefinitive"] = True
+    write_settings(merged)
+    return {"ok": True, "listeFinaleValideeDefinitive": True}
 
 
 def _service_nom_normalized(nom: str) -> str:
@@ -564,6 +644,7 @@ def refus_definitif_demande(
     user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
 ):
     _ = user
+    raise_if_liste_finale_definitive()
     demande = db.query(DemandeInscription).filter(DemandeInscription.id == demande_id).first()
     if not demande:
         raise HTTPException(status_code=404, detail="Demande introuvable.")
@@ -586,6 +667,7 @@ def set_selection_finale(
     user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
 ):
     """Validation ou refus des informations de la demande (RETENUE / NON_VALIDEE). Ne remplace pas la liste finale automatique après clôture."""
+    raise_if_liste_finale_definitive()
     demande = db.query(DemandeInscription).filter(DemandeInscription.id == demande_id).first()
     if not demande:
         raise HTTPException(status_code=404, detail="Demande introuvable.")
@@ -672,6 +754,7 @@ def transferer_demande(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
 ):
+    raise_if_liste_finale_definitive()
     ensure_listes_exist(db)
     demande = db.query(DemandeInscription).filter(DemandeInscription.id == demande_id).first()
     if not demande:
@@ -827,6 +910,7 @@ def swap_rang(
     user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
 ):
     _ = user
+    raise_if_liste_finale_definitive()
     d1 = db.query(DemandeInscription).filter(DemandeInscription.id == demande_id).first()
     d2 = db.query(DemandeInscription).filter(DemandeInscription.id == payload.other_demande_id).first()
     if not d1 or not d2:
@@ -1001,6 +1085,7 @@ def valider_desistement(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
 ):
+    raise_if_liste_finale_definitive()
     d = db.query(Desistement).filter(Desistement.id == desistement_id).first()
     if not d:
         raise HTTPException(status_code=404, detail="Désistement introuvable.")

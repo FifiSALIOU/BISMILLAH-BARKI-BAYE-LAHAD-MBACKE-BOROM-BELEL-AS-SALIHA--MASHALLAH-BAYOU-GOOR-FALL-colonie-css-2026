@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.models.enums import DemandeStatut, LienParente, ListeCode, Sexe
 from app.models.models import DemandeInscription, Enfant, Liste, Parent, Service, User
+from app.services.liste_finale_lock import raise_if_liste_finale_definitive
 from app.services.runtime_settings_store import get_max_enfants_par_parent
 from app.services.users import (
     _get_or_create_site,
@@ -226,6 +227,8 @@ def create_inscription_for_parent_user(
     if user.matricule is None or user.matricule != parent_matricule:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Matricule non autorisé.")
 
+    raise_if_liste_finale_definitive()
+
     _validate_annee_naissance(enfant_date_naissance)
 
     site_row = _get_or_create_site(db, parent_site_code)
@@ -331,6 +334,7 @@ def create_inscription_for_parent_user(
 
 
 def set_titulaire(*, db: Session, user: User, enfant_id_titulaire: int) -> None:
+    raise_if_liste_finale_definitive()
     parent = db.query(Parent).filter(Parent.user_id == user.id).first()
     if not parent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent introuvable.")
@@ -404,6 +408,7 @@ def set_titulaire(*, db: Session, user: User, enfant_id_titulaire: int) -> None:
 
 
 def request_desistement(*, db: Session, user: User, demande_id: int, reason: str | None) -> None:
+    raise_if_liste_finale_definitive()
     # Ancien flux (conservé en mémoire lecture seule) : création d’une ligne `Desistement` en attente,
     # puis validation ultérieure par le gestionnaire. Désormais le désistement parent est appliqué tout de suite
     # (statut DESISTEE + renumérotation) ; `reason` est transmis à l’e-mail admin depuis le routeur parent.
@@ -435,6 +440,7 @@ def request_desistement(*, db: Session, user: User, demande_id: int, reason: str
 
 
 def cancel_desistement(*, db: Session, user: User, demande_id: int) -> None:
+    raise_if_liste_finale_definitive()
     parent = db.query(Parent).filter(Parent.user_id == user.id).first()
     if not parent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent introuvable.")
@@ -456,6 +462,7 @@ def cancel_desistement(*, db: Session, user: User, demande_id: int) -> None:
 
 
 def reinscrire_desiste(*, db: Session, user: User, demande_id: int) -> DemandeInscription:
+    raise_if_liste_finale_definitive()
     parent = db.query(Parent).filter(Parent.user_id == user.id).first()
     if not parent:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent introuvable.")
@@ -504,6 +511,7 @@ def admin_corriger_demande_rejetee(
     Si le lien passe de Père / Mère / Tuteur légal à Autre : la demande est affectée à la liste ATTENTE_N2
     (même mécanisme de renumérotation que pour une correction sur la liste d'origine).
     """
+    raise_if_liste_finale_definitive()
     demande = db.query(DemandeInscription).filter(DemandeInscription.id == demande_id).first()
     if not demande:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande introuvable.")

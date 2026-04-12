@@ -30,6 +30,7 @@ from app.services.users import TELEPHONE_DEJA_UTILISE_DETAIL
 from app.services.email import send_email, uniq_emails
 from app.services.notify_helpers import collect_admin_emails
 from app.services.liste_finale_compute import demandes_liste_finale_retenus_si_cloturees
+from app.services.liste_finale_lock import liste_finale_definitive_validee
 from app.services.email_templates import (
     body_desistement_cancelled_admin,
     body_desistement_validated_admin,
@@ -138,9 +139,10 @@ def liste_finale_globale_parent(
     """Liste finale globale (lecture seule), publiée seulement après clôture des inscriptions."""
     _ = user
     ensure_listes_exist(db)
+    definitive = liste_finale_definitive_validee()
     ordered = demandes_liste_finale_retenus_si_cloturees(db)
     if ordered is None:
-        return {"disponible": False, "retenus": []}
+        return {"disponible": False, "retenus": [], "liste_finale_definitive": definitive}
 
     out = []
     for idx, d in enumerate(ordered, start=1):
@@ -162,7 +164,7 @@ def liste_finale_globale_parent(
                 "enfant_sexe": e.sexe.value,
             }
         )
-    return {"disponible": True, "retenus": out}
+    return {"disponible": True, "retenus": out, "liste_finale_definitive": definitive}
 
 
 @router.get("/inscriptions-transparence", response_model=list[TransparenceInscriptionOut])
