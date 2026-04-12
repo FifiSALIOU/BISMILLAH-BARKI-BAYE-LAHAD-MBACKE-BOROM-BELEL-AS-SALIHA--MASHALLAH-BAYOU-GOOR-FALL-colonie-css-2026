@@ -259,24 +259,30 @@ export default function GestionListe({ type }: Props) {
     return { headers, rows };
   };
 
-  const exportExcel = () => {
+  /** Export PDF / Excel : sans « Informations » ni « Désistement » (tableau à l’écran inchangé). */
+  const dataForPdfExcelExport = () => {
     const { headers, rows } = generateCSV();
+    return {
+      headers: headers.slice(0, -2),
+      rows: rows.map((r) => r.slice(0, -2)),
+    };
+  };
+
+  const exportExcel = () => {
+    const { headers, rows } = dataForPdfExcelExport();
     exportStyledExcel(headers, rows, type, `${type}.xlsx`);
   };
 
   const exportPDF = () => {
-    const { headers, rows } = generateCSV();
-    // PDF : sans les colonnes « Informations » et « Désistement » (Excel / écran inchangés).
-    const pdfHeaders = headers.slice(0, -2);
-    const pdfRows = rows.map((r) => r.slice(0, -2));
+    const { headers, rows } = dataForPdfExcelExport();
     const doc = new jsPDF({ orientation: 'landscape' });
     doc.setFontSize(16);
     doc.text(titles[type], 14, 15);
     doc.setFontSize(10);
     doc.text(`Total : ${enfantsOrdreArrivee.length} enfant(s)`, 14, 22);
     autoTable(doc, {
-      head: [pdfHeaders],
-      body: pdfRows.map((r) => r.map((c) => String(c))),
+      head: [headers],
+      body: rows.map((r) => r.map((c) => String(c))),
       startY: 28,
       styles: { fontSize: 8 },
       headStyles: { fillColor: [59, 130, 246] },
