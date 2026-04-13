@@ -23,8 +23,8 @@ export default function ForcePasswordChange() {
       setErrorOpen(true);
       return;
     }
-    if (newPwd.length < 6) {
-      setErrorMessage('Le mot de passe doit contenir au moins 6 caractères.');
+    if (newPwd.length < 8) {
+      setErrorMessage('Le mot de passe doit contenir au moins 8 caractères.');
       setErrorOpen(true);
       return;
     }
@@ -86,7 +86,7 @@ export default function ForcePasswordChange() {
               <Label className="text-foreground font-medium">Nouveau mot de passe</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input type="password" placeholder="Minimum 6 caractères" value={newPwd} onChange={e => setNewPwd(e.target.value)} className="pl-10 h-12 rounded-lg" />
+                <Input type="password" placeholder="Minimum 8 caractères" value={newPwd} onChange={e => setNewPwd(e.target.value)} className="pl-10 h-12 rounded-lg" />
               </div>
             </div>
             <div className="space-y-2">
