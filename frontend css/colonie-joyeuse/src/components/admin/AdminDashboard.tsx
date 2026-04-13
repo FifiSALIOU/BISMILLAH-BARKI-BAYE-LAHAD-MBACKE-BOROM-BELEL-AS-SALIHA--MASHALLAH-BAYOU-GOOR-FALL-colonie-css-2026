@@ -4,6 +4,7 @@ import { useInscription } from '@/contexts/InscriptionContext';
 import { Users, UserCheck, Clock, TrendingUp, Award, HandMetal } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 
 type RecentActivityRow = {
   id: string;

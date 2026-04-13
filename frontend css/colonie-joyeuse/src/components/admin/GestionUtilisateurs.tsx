@@ -18,7 +18,7 @@ import type { ImportResult } from './ImportExcel';
 
 export default function GestionUtilisateurs() {
   const { token } = useAuth();
-  type ParentRow = Parent & { userId: string };
+  type ParentRow = Parent & { userId: string; actif: boolean };
   const [parents, setParents] = useState<ParentRow[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [sites, setSites] = useState<Array<{ id: number; nom: string; code: string }>>([]);
@@ -95,6 +95,7 @@ export default function GestionUtilisateurs() {
         email: u.email || '',
         telephone: u.parent_telephone || '',
         premiereConnexion: false,
+        actif: !!u.is_active,
       }));
     setAdmins(mappedAdmins);
     setParents(mappedParents);
@@ -248,6 +249,18 @@ export default function GestionUtilisateurs() {
     });
     await refreshUsers();
     toast({ title: !admin.actif ? '✅ Activé' : '⚠️ Désactivé' });
+  };
+
+  const handleToggleParentActif = async (userId: string) => {
+    const row = parents.find((p) => p.userId === userId);
+    if (!row) return;
+    await apiRequest(`/admin/users/${userId}`, {
+      method: 'PATCH',
+      token,
+      body: JSON.stringify({ is_active: !row.actif }),
+    });
+    await refreshUsers();
+    toast({ title: !row.actif ? '✅ Activé' : '⚠️ Désactivé' });
   };
 
   const openEdit = (admin: AdminUser) => { setEditingAdmin({ ...admin }); setEditOpen(true); };
@@ -482,6 +495,7 @@ export default function GestionUtilisateurs() {
                   <TableHead className="font-semibold">Nom</TableHead>
                   <TableHead className="font-semibold">Prénom</TableHead>
                   <TableHead className="font-semibold">Service</TableHead>
+                  <TableHead className="font-semibold">Statut</TableHead>
                   <TableHead className="font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -492,6 +506,18 @@ export default function GestionUtilisateurs() {
                     <TableCell className="font-medium">{p.nom}</TableCell>
                     <TableCell>{p.prenom}</TableCell>
                     <TableCell className="text-sm">{p.service}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Switch
+                          checked={p.actif}
+                          onCheckedChange={() => void handleToggleParentActif(p.userId)}
+                          className="data-[state=checked]:bg-emerald-500"
+                        />
+                        <span className={`text-xs font-medium ${p.actif ? 'text-emerald-600' : 'text-muted-foreground'}`}>
+                          {p.actif ? 'Actif' : 'Inactif'}
+                        </span>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
                         <Button size="sm" variant="ghost" onClick={() => { setEditingParent({ ...p }); setEditParentOpen(true); }} className="h-8 w-8 p-0"><Pencil className="w-3 h-3" /></Button>
