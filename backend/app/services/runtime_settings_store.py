@@ -5,6 +5,29 @@ import json
 from pathlib import Path
 from typing import Any
 
+# Aligné sur RuntimeSettingsIn (admin) + clés cycle liste finale
+DEFAULT_RUNTIME_SETTINGS: dict[str, Any] = {
+    "colonieNom": "Colonie de Vacances 2026",
+    "dateDebutInscriptions": "2026-01-01",
+    "dateFinInscriptions": "2026-04-30",
+    "dateDebutColonie": "2026-07-01",
+    "dateFinColonie": "2026-08-31",
+    "capaciteMax": 100,
+    "maxEnfantsParParent": 2,
+    "ageMin": 2012,
+    "ageMax": 2019,
+    "inscriptionsOuvertes": True,
+    "accesParentsActif": True,
+    "listeFinalePretePourValidation": False,
+    "listeFinaleValideeDefinitive": False,
+}
+
+
+def merged_runtime_settings() -> dict[str, Any]:
+    """Fusion défauts + fichier runtime_settings.json (même logique que l’admin)."""
+    return {**DEFAULT_RUNTIME_SETTINGS, **read_settings()}
+
+
 def _path() -> Path:
     base = Path(__file__).resolve().parents[2] / "data"
     base.mkdir(parents=True, exist_ok=True)
@@ -24,6 +47,27 @@ def read_settings() -> dict[str, Any]:
 
 def merge_with_defaults(defaults: dict[str, Any]) -> dict[str, Any]:
     return {**defaults, **read_settings()}
+
+
+# Clés exposées sans authentification (page login, bandeaux)
+_PUBLIC_SETTINGS_KEYS = (
+    "colonieNom",
+    "dateDebutInscriptions",
+    "dateFinInscriptions",
+    "dateDebutColonie",
+    "dateFinColonie",
+    "capaciteMax",
+    "maxEnfantsParParent",
+    "ageMin",
+    "ageMax",
+    "inscriptionsOuvertes",
+    "accesParentsActif",
+)
+
+
+def public_runtime_settings_for_client() -> dict[str, Any]:
+    full = merged_runtime_settings()
+    return {k: full[k] for k in _PUBLIC_SETTINGS_KEYS if k in full}
 
 
 def write_settings(payload: dict[str, Any]) -> None:

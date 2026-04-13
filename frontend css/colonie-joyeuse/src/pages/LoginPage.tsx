@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInscription } from '@/contexts/InscriptionContext';
+import { apiRequest } from '@/lib/api';
+import type { AppSettings } from '@/data/mockData';
 import logo from '@/assets/logo.png';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,13 +13,27 @@ import { KeyRound, AlertTriangle, Lock, Eye, EyeOff, Info } from 'lucide-react';
 
 export default function LoginPage() {
   const { loginAsParent, loginAsAdmin } = useAuth();
-  const { settings } = useInscription();
+  const { settings, updateSettings } = useInscription();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [errorOpen, setErrorOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [errorTitle, setErrorTitle] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    apiRequest<Partial<AppSettings>>('/auth/public-settings')
+      .then((cfg) => {
+        if (!cancelled && cfg && typeof cfg === 'object') updateSettings(cfg);
+      })
+      .catch(() => {
+        /* garder DEFAULT_SETTINGS du contexte */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const today = new Date().toISOString().split('T')[0];
   const inscriptionsClosed = !settings.inscriptionsOuvertes || today > settings.dateFinInscriptions;

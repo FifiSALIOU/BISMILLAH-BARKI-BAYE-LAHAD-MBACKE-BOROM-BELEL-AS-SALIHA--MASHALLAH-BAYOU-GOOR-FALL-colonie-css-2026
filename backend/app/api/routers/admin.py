@@ -29,7 +29,13 @@ from app.services.inscriptions import (
 from app.services.liste_finale_compute import demandes_liste_finale_retenus_si_cloturees, inscriptions_cloturees
 from app.services.liste_finale_lock import raise_if_liste_finale_definitive
 from app.services.notify_helpers import collect_admin_emails
-from app.services.runtime_settings_store import merge_with_defaults, read_settings, write_settings
+from app.services.runtime_settings_store import (
+    DEFAULT_RUNTIME_SETTINGS,
+    merge_with_defaults,
+    merged_runtime_settings,
+    read_settings,
+    write_settings,
+)
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -92,14 +98,11 @@ class ServiceConfigIn(BaseModel):
 
 
 def _default_runtime_settings() -> dict:
-    d = RuntimeSettingsIn().model_dump()
-    d["listeFinalePretePourValidation"] = False
-    d["listeFinaleValideeDefinitive"] = False
-    return d
+    return dict(DEFAULT_RUNTIME_SETTINGS)
 
 
 def _read_runtime_settings() -> dict:
-    return merge_with_defaults(_default_runtime_settings())
+    return merged_runtime_settings()
 
 
 def _liste_finale_reset_si_parametres_cles_changes(prev: dict, incoming: dict) -> bool:
@@ -173,7 +176,7 @@ def confirmer_generation_liste_finale(
             detail="Les inscriptions ne sont pas encore clôturées.",
         )
     raise_if_liste_finale_definitive()
-    merged = {**_default_runtime_settings(), **read_settings()}
+    merged = {**merged_runtime_settings()}
     merged["listeFinalePretePourValidation"] = True
     write_settings(merged)
     return {"ok": True, "listeFinalePretePourValidation": True}
@@ -196,7 +199,7 @@ def valider_liste_finale_definitive(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La liste finale est déjà validée définitivement.",
         )
-    merged = {**_default_runtime_settings(), **rs}
+    merged = {**DEFAULT_RUNTIME_SETTINGS, **rs}
     merged["listeFinaleValideeDefinitive"] = True
     write_settings(merged)
     return {"ok": True, "listeFinaleValideeDefinitive": True}

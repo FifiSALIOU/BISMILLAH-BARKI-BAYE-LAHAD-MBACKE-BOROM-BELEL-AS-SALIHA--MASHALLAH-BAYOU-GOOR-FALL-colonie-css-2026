@@ -84,6 +84,8 @@ def creer_inscription(
     admin_emails = collect_admin_emails(db)
 
     enfant_label = f"{payload.enfant.prenom} {payload.enfant.nom}"
+    # Heure réelle d’enregistrement (created_at côté base) — pas seulement la date « métier » date_inscription (minuit).
+    enregistrement_when = demande.created_at if demande.created_at is not None else datetime.now(timezone.utc)
 
     to_admins = uniq_emails(admin_emails)
     if to_admins:
@@ -96,7 +98,7 @@ def creer_inscription(
             enfant_nom=payload.enfant.nom,
             liste=out.liste_code,
             rang=out.rang_dans_liste,
-            date=out.date_inscription,
+            date=enregistrement_when,
         )
         background.add_task(send_email, to=to_admins, subject=subject_admin, body=body_admin)
 

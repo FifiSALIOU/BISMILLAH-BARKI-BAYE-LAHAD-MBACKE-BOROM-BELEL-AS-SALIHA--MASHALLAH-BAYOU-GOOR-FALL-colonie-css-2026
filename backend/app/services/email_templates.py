@@ -42,9 +42,10 @@ def body_inscription_admin_notify(
     date: datetime,
 ):
     """Message pour gestionnaires / super admins (ton informatif, pas « votre inscription »)."""
+    parent_label = f"{parent_prenom} {parent_nom}".strip() or parent_matricule
     return (
         "Bonjour,\n\n"
-        "Un parent vient d’enregistrer une nouvelle inscription sur la plateforme Colonie 2026.\n\n"
+        f"{parent_label} vient d’enregistrer une nouvelle inscription sur la plateforme Colonie 2026.\n\n"
         f"- Matricule parent: {parent_matricule}\n"
         f"- Parent: {parent_prenom} {parent_nom}\n"
         f"- Enfant: {enfant_prenom} {enfant_nom}\n"

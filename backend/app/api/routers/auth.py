@@ -17,10 +17,17 @@ from app.schemas.auth import (
 )
 from app.security import create_access_token, hash_password, verify_password
 from app.services import admin_must_change_store
+from app.services.runtime_settings_store import public_runtime_settings_for_client
 from app.services.users import change_password_self
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 DEFAULT_PARENT_PASSWORD = "Passer123"
+
+
+@router.get("/public-settings")
+def get_public_runtime_settings():
+    """Paramètres d’affichage (dates d’inscription, accès parents) sans authentification — page de connexion."""
+    return public_runtime_settings_for_client()
 
 
 def _must_change_password(user: User) -> bool:
