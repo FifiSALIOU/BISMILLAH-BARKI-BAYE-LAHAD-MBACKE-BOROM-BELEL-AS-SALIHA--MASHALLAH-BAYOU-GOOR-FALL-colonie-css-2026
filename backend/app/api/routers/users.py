@@ -24,6 +24,7 @@ from app.services.users import (
     change_password_for_user,
     create_user_superadmin,
     delete_user_by_super_admin,
+    reset_parent_password_to_default,
     set_admin_temp_password,
     set_user_active,
     update_user,
@@ -285,4 +286,17 @@ def reset_password_user_auto(
     contact = _admin_contact_email(user)
     if contact:
         background_tasks.add_task(_send_admin_password_reset_email, contact, temp_password)
+    return {"ok": True}
+
+
+@router.post("/{user_id}/reset-password-parent-default")
+def reset_password_parent_default(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
+):
+    """Parents uniquement : mot de passe = Passer123, changement obligatoire à la connexion."""
+    _ = admin
+    reset_parent_password_to_default(db, user_id=user_id)
+    db.commit()
     return {"ok": True}

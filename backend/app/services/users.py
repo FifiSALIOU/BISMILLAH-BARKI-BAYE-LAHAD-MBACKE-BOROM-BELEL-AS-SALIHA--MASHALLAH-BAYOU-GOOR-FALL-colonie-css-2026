@@ -355,6 +355,26 @@ def change_password_for_user(db: Session, *, user_id: int, new_password: str) ->
     db.flush()
 
 
+# Mot de passe initial parent (aligné sur app/api/routers/users.py DEFAULT_PARENT_PASSWORD)
+DEFAULT_PARENT_PLAIN_PASSWORD = "Passer123"
+
+
+def reset_parent_password_to_default(db: Session, *, user_id: int) -> None:
+    """Réinitialise uniquement un compte PARENT : Passer123 + changement obligatoire à la prochaine connexion."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Utilisateur introuvable.")
+    if user.role != UserRole.PARENT:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cette réinitialisation est réservée aux comptes parent.",
+        )
+    user.password = hash_password(DEFAULT_PARENT_PLAIN_PASSWORD)
+    user.must_change_password = True
+    admin_must_change_store.clear_flag(user_id)
+    db.flush()
+
+
 def set_admin_temp_password(db: Session, *, user_id: int, temp_password: str) -> User:
     user = db.query(User).filter(User.id == user_id).first()
     if not user:

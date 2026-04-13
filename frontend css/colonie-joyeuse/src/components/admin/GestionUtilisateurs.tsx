@@ -51,7 +51,6 @@ export default function GestionUtilisateurs() {
   // Reset password
   const [resetPwdOpen, setResetPwdOpen] = useState(false);
   const [resetPwdTarget, setResetPwdTarget] = useState<{ type: 'admin' | 'parent'; id: string; name: string } | null>(null);
-  const [resetNewPwd, setResetNewPwd] = useState('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importExcelOpen, setImportExcelOpen] = useState(false);
@@ -396,18 +395,21 @@ export default function GestionUtilisateurs() {
         token,
       });
     } else {
-      if (!resetNewPwd) return;
       const target = parents.find((p) => p.matricule === resetPwdTarget.id);
       if (!target) return;
-      await apiRequest(`/admin/users/${target.userId}/reset-password`, {
+      await apiRequest(`/admin/users/${target.userId}/reset-password-parent-default`, {
         method: 'POST',
         token,
-        body: JSON.stringify({ new_password: resetNewPwd }),
       });
     }
     setResetPwdOpen(false);
-    setResetNewPwd('');
-    toast({ title: '✅ Mot de passe réinitialisé' });
+    toast({
+      title: '✅ Mot de passe réinitialisé',
+      description:
+        resetPwdTarget.type === 'parent'
+          ? 'Le parent se connecte avec Passer123 puis doit choisir un nouveau mot de passe.'
+          : undefined,
+    });
   };
 
   return (
@@ -711,13 +713,10 @@ export default function GestionUtilisateurs() {
               Un mot de passe temporaire sera généré automatiquement puis envoyé par e-mail à <strong>{resetPwdTarget?.name}</strong>.
             </p>
           ) : (
-            <>
-              <p className="text-sm text-muted-foreground">Nouveau mot de passe pour <strong>{resetPwdTarget?.name}</strong></p>
-              <div className="space-y-2">
-                <Label>Nouveau mot de passe</Label>
-                <Input type="password" value={resetNewPwd} onChange={e => setResetNewPwd(e.target.value)} className="rounded-lg" />
-              </div>
-            </>
+            <p className="text-sm text-muted-foreground">
+              Le mot de passe de <strong>{resetPwdTarget?.name}</strong> sera réinitialisé à <strong>Passer123</strong>. À la
+              prochaine connexion avec le matricule et ce mot de passe, le parent devra obligatoirement en définir un nouveau.
+            </p>
           )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setResetPwdOpen(false)} className="rounded-lg">Annuler</Button>
