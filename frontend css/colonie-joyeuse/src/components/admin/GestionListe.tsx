@@ -323,11 +323,13 @@ export default function GestionListe({ type }: Props) {
           <SelectTrigger className="w-[180px] rounded-lg"><Filter className="w-3 h-3 mr-2" /><SelectValue placeholder="Désistement" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Tous</SelectItem>
+            {/* Options masquées (demande métier) — logique de filtrage inchangée côté code.
             <SelectItem value="aucun">Sans désistement</SelectItem>
             <SelectItem value="demandé">Désistement demandé</SelectItem>
             <SelectItem value="validé">Désistement validé</SelectItem>
-            <SelectItem value="reinscrit">Enfant réinscrit</SelectItem>
             <SelectItem value="refusé">Enfants refusés</SelectItem>
+            */}
+            <SelectItem value="reinscrit">Enfant réinscrit</SelectItem>
           </SelectContent>
         </Select>
       </motion.div>
