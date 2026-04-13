@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { KeyRound, AlertTriangle, Lock, Eye, EyeOff, Info } from 'lucide-react';
 
 export default function LoginPage() {
-  const { loginAsParent, loginAsAdmin, setAuthStep } = useAuth();
+  const { loginAsParent, loginAsAdmin } = useAuth();
   const { settings } = useInscription();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -138,9 +138,9 @@ export default function LoginPage() {
               Se connecter
             </Button>
 
-            <button onClick={() => setAuthStep('forgot_password')} className="w-full text-sm text-brand-navy hover:text-brand-navy/80 transition-colors font-medium">
+            {/* <button onClick={() => setAuthStep('forgot_password')} className="w-full text-sm text-brand-navy hover:text-brand-navy/80 transition-colors font-medium">
               🔑 Mot de passe oublié ?
-            </button>
+            </button> */}
 
             <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
               <p className="text-xs text-muted-foreground">
