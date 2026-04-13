@@ -14,10 +14,8 @@ from app.models.enums import DemandeStatut, ListeCode, LienParente, Sexe, UserRo
 from app.models.models import DemandeInscription, Desistement, Enfant, Liste, Parent, Service, Site, User
 from app.services.email import send_email, uniq_emails
 from app.services.email_templates import (
-    body_desistement_validated_admin,
     body_selection,
     body_transfer,
-    subject_desistement_valide_admin,
     subject_selection,
     subject_transfer,
 )
@@ -1130,18 +1128,19 @@ def valider_desistement(
         date_action=validated_at,
     )
 
-    admin_emails = collect_admin_emails(db)
-    enfant_label = f"{enfant.prenom} {enfant.nom}"
-    to_admins = uniq_emails(admin_emails)
-    if to_admins:
-        background.add_task(
-            send_email,
-            to=to_admins,
-            subject=subject_desistement_valide_admin(parent.matricule, enfant_label),
-            body=body_desistement_validated_admin(
-                parent_matricule=parent.matricule,
-                enfant=enfant_label,
-                when=validated_at,
-            ),
-        )
+    # E-mail « Désistement validé (notification) » aux admins — désactivé (demande métier).
+    # enfant_label = f"{enfant.prenom} {enfant.nom}"
+    # admin_emails = collect_admin_emails(db)
+    # to_admins = uniq_emails(admin_emails)
+    # if to_admins:
+    #     background.add_task(
+    #         send_email,
+    #         to=to_admins,
+    #         subject=subject_desistement_valide_admin(parent.matricule, enfant_label),
+    #         body=body_desistement_validated_admin(
+    #             parent_matricule=parent.matricule,
+    #             enfant=enfant_label,
+    #             when=validated_at,
+    #         ),
+    #     )
     return {"ok": True}

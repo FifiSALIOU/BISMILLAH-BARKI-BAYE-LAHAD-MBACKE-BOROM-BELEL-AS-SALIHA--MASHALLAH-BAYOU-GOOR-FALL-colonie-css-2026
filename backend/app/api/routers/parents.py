@@ -32,11 +32,9 @@ from app.services.notify_helpers import collect_admin_emails
 from app.services.liste_finale_compute import demandes_liste_finale_retenus_si_cloturees
 from app.services.liste_finale_lock import liste_finale_definitive_validee
 from app.services.email_templates import (
-    body_desistement_cancelled_admin,
     body_desistement_validated_admin,
     body_inscription_admin_notify,
     body_titulaire,
-    subject_desistement_annule_admin,
     subject_desistement_valide_admin,
     subject_inscription_admin_notify,
     subject_titulaire,
@@ -352,21 +350,22 @@ def annuler_desistement(
     cancel_desistement(db=db, user=user, demande_id=demande_id)
     db.commit()
 
-    if parent and enfant_label:
-        admin_emails = collect_admin_emails(db)
-        now = datetime.now(timezone.utc)
-        to_admins = uniq_emails(admin_emails)
-        if to_admins:
-            background.add_task(
-                send_email,
-                to=to_admins,
-                subject=subject_desistement_annule_admin(parent.matricule, enfant_label),
-                body=body_desistement_cancelled_admin(
-                    parent_matricule=parent.matricule,
-                    enfant=enfant_label,
-                    when=now,
-                ),
-            )
+    # E-mail « Annulation de désistement » aux admins — désactivé (demande métier).
+    # if parent and enfant_label:
+    #     admin_emails = collect_admin_emails(db)
+    #     now = datetime.now(timezone.utc)
+    #     to_admins = uniq_emails(admin_emails)
+    #     if to_admins:
+    #         background.add_task(
+    #             send_email,
+    #             to=to_admins,
+    #             subject=subject_desistement_annule_admin(parent.matricule, enfant_label),
+    #             body=body_desistement_cancelled_admin(
+    #                 parent_matricule=parent.matricule,
+    #                 enfant=enfant_label,
+    #                 when=now,
+    #             ),
+    #         )
     return {"ok": True}
 
 
