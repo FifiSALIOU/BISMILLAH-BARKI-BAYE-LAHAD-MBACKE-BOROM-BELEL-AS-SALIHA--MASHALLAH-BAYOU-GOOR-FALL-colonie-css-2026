@@ -374,11 +374,23 @@ export default function ParentDashboard() {
     const tabKey = getListeTabKey(enfant.liste);
     setActiveTab(tabKey);
     setHighlightedEnfantId(enfant.id);
-    setTimeout(() => {
-      tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      setTimeout(() => setHighlightedEnfantId(null), 3000);
-    }, 100);
+    setTimeout(() => setHighlightedEnfantId(null), 3000);
   };
+
+  useEffect(() => {
+    if (!highlightedEnfantId) return;
+    const rowId = `enfant-row-${highlightedEnfantId}`;
+    // Après changement d'onglet, attendre le rendu puis cibler la ligne.
+    const t = window.setTimeout(() => {
+      const rowEl = document.getElementById(rowId);
+      if (rowEl) {
+        rowEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        tabsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }, 220);
+    return () => window.clearTimeout(t);
+  }, [activeTab, highlightedEnfantId]);
 
   // List data for tabs — aligné sur `rang_dans_liste` (champ `rangListe`) comme côté gestionnaire
   const getListeEnfants = (liste: string) => {
