@@ -13,6 +13,7 @@ from app.models.models import DemandeInscription, Enfant, Parent, User
 from app.schemas.inscriptions import (
     DemandeOut,
     DesistementRequestIn,
+    EnfantCorrectionIn,
     InscriptionCreateIn,
     TitulaireUpdateIn,
     TransparenceInscriptionOut,
@@ -22,6 +23,7 @@ from app.services.inscriptions import (
     cancel_desistement,
     create_inscription_for_parent_user,
     ensure_listes_exist,
+    parent_corriger_demande_sans_changer_rang,
     reinscrire_desiste,
     request_desistement,
     set_titulaire,
@@ -122,6 +124,28 @@ def mes_demandes(
         .all()
     )
     return [_to_demande_out(db, d) for d in demandes]
+
+
+@router.put("/demandes/{demande_id}", response_model=DemandeOut)
+def corriger_demande(
+    demande_id: int,
+    payload: EnfantCorrectionIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.PARENT)),
+) -> DemandeOut:
+    demande = parent_corriger_demande_sans_changer_rang(
+        db=db,
+        user=user,
+        demande_id=demande_id,
+        prenom=payload.prenom,
+        nom=payload.nom,
+        date_naissance=payload.date_naissance,
+        sexe=payload.sexe,
+        lien_parente=payload.lien_parente,
+    )
+    db.commit()
+    db.refresh(demande)
+    return _to_demande_out(db, demande)
 
 
 _LISTE_ORDRE: dict[ListeCode, int] = {

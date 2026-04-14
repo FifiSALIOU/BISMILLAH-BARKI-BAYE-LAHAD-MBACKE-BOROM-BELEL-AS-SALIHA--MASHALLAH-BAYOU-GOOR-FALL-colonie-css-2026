@@ -19,7 +19,7 @@ import {
   idDemandePourRang,
   rangAfficheParDemandeIdPourEnfants,
 } from '@/lib/ordreArriveeListe';
-import { Users, UserCheck, Clock, Star, Award, AlertTriangle, Lock, UserPlus, ArrowUpDown, HandMetal, XCircle, RotateCcw, Hash, Search, User } from 'lucide-react';
+import { Users, UserCheck, Clock, Star, Award, AlertTriangle, Lock, UserPlus, ArrowUpDown, HandMetal, XCircle, RotateCcw, Hash, Search, User, FilePenLine } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -28,6 +28,15 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import InscrireEnfant from '@/components/parent/InscrireEnfant';
 import ListeFinaleParent from '@/components/parent/ListeFinaleParent';
+
+type LienParenteApi = 'PERE' | 'MERE' | 'TUTEUR_LEGAL' | 'AUTRE';
+
+const LIEN_PARENTE_FR_TO_API: Record<string, LienParenteApi> = {
+  'Père': 'PERE',
+  'Mère': 'MERE',
+  'Tuteur légal': 'TUTEUR_LEGAL',
+  Autre: 'AUTRE',
+};
 
 export default function ParentDashboard() {
   const { parent, token } = useAuth();
@@ -95,6 +104,13 @@ export default function ParentDashboard() {
   const [reinscrireId, setReinscrireId] = useState('');
   const [reinscireName, setReinscireName] = useState('');
   const [cancelDesistError, setCancelDesistError] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editEnfantId, setEditEnfantId] = useState('');
+  const [editPrenom, setEditPrenom] = useState('');
+  const [editNom, setEditNom] = useState('');
+  const [editDateNaissance, setEditDateNaissance] = useState('');
+  const [editSexe, setEditSexe] = useState<'M' | 'F'>('M');
+  const [editLienParente, setEditLienParente] = useState<LienParenteApi>('PERE');
 
   // Tabs
   const [activeTab, setActiveTab] = useState('principale');
@@ -254,6 +270,51 @@ export default function ParentDashboard() {
       console.error(err);
     }
     setReinscrireOpen(false);
+  };
+
+  const handleEditDemande = (enfant: Enfant) => {
+    const lienApi = LIEN_PARENTE_FR_TO_API[enfant.lienParente] || 'AUTRE';
+    setEditEnfantId(enfant.id);
+    setEditPrenom(enfant.prenom);
+    setEditNom(enfant.nom);
+    setEditDateNaissance((enfant.dateNaissance || '').slice(0, 10));
+    setEditSexe(enfant.sexe === 'F' ? 'F' : 'M');
+    setEditLienParente(lienApi);
+    setEditOpen(true);
+  };
+
+  const confirmEditDemande = async () => {
+    if (!token) return;
+    if (!editPrenom.trim() || !editNom.trim() || !editDateNaissance) {
+      toast({ title: 'Champs requis', description: 'Prénom, nom et date de naissance sont obligatoires.', variant: 'destructive' });
+      return;
+    }
+    try {
+      await apiRequest(`/parent/demandes/${Number(editEnfantId)}`, {
+        method: 'PUT',
+        token,
+        body: JSON.stringify({
+          prenom: editPrenom.trim(),
+          nom: editNom.trim(),
+          date_naissance: editDateNaissance,
+          sexe: editSexe,
+          lien_parente: editLienParente,
+        }),
+      });
+      await loadAll();
+      addHistorique({
+        utilisateur: `${parent.prenom} ${parent.nom}`,
+        role: 'Parent',
+        action: 'Correction inscription',
+        details: `A corrigé les informations de ${editPrenom.trim()} ${editNom.trim()} sans changement de rang.`,
+        cible: `${editPrenom.trim()} ${editNom.trim()}`,
+      });
+      setEditOpen(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Correction impossible';
+      toast({ title: 'Correction impossible', description: msg, variant: 'destructive' });
+      console.error(err);
+    }
   };
 
   const getStatutStyle = (statut: string) => {
@@ -567,6 +628,11 @@ export default function ParentDashboard() {
 
                   {/* Action buttons */}
                   <div className="flex gap-2 mt-2 flex-wrap" onClick={e => e.stopPropagation()}>
+                    {!inscriptionsCloturees && !slot.enfant.rejetDefinitif && !slot.enfant.desistement && !listeFinaleDefinitiveApi && (
+                      <Button variant="outline" size="sm" onClick={() => handleEditDemande(slot.enfant!)} className="rounded-lg gap-1 text-xs">
+                        <FilePenLine className="w-3 h-3" />Modifier
+                      </Button>
+                    )}
                     {!inscriptionsCloturees && slot.enfant.statut !== 'Titulaire' && slot.enfant.lienParente !== 'Autre' && !slot.enfant.desistement && !slot.enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <Button variant="outline" size="sm" onClick={() => handleSetTitulaire(slot.enfant!.id, `${slot.enfant!.prenom} ${slot.enfant!.nom}`)} className="rounded-lg gap-1 text-xs">
                         <ArrowUpDown className="w-3 h-3" />Définir titulaire
@@ -648,6 +714,59 @@ export default function ParentDashboard() {
             nbEnfantsInscrits={enfants.length}
             onInscriptionSuccess={() => { void loadAll(); }}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-lg rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Modifier la demande</DialogTitle>
+            <DialogDescription className="pt-2">
+              Corrigez les informations si nécessaire. Votre rang et votre position dans la liste restent inchangés.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 py-2">
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Prénom</label>
+              <Input value={editPrenom} onChange={(e) => setEditPrenom(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Nom</label>
+              <Input value={editNom} onChange={(e) => setEditNom(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Date de naissance</label>
+              <Input type="date" value={editDateNaissance} onChange={(e) => setEditDateNaissance(e.target.value)} />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Sexe</label>
+              <select
+                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                value={editSexe}
+                onChange={(e) => setEditSexe(e.target.value === 'F' ? 'F' : 'M')}
+              >
+                <option value="M">Masculin</option>
+                <option value="F">Féminin</option>
+              </select>
+            </div>
+            <div className="space-y-2 sm:col-span-2">
+              <label className="text-sm font-medium text-foreground">Lien de parenté</label>
+              <select
+                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                value={editLienParente}
+                onChange={(e) => setEditLienParente((e.target.value as LienParenteApi) || 'AUTRE')}
+              >
+                <option value="PERE">Père</option>
+                <option value="MERE">Mère</option>
+                <option value="TUTEUR_LEGAL">Tuteur légal</option>
+                <option value="AUTRE">Autre</option>
+              </select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} className="rounded-lg">Annuler</Button>
+            <Button onClick={confirmEditDemande} className="rounded-lg bg-accent text-white hover:bg-accent/90">Enregistrer la correction</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

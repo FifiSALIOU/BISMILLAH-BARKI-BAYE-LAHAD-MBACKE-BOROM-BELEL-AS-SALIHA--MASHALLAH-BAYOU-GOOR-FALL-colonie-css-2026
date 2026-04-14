@@ -285,7 +285,7 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label className="text-foreground">Lien de parenté *</Label>
-                <Select value={lienParente} onValueChange={setLienParente}>
+                <Select value={lienParente} onValueChange={(value) => setLienParente(value as LienParenteApi)}>
                   <SelectTrigger className="h-11 rounded-lg"><SelectValue placeholder="Sélectionner le lien" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="PERE">Père</SelectItem>
@@ -362,7 +362,7 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
               <strong>Sexe :</strong> {sexe === 'M' ? 'Masculin' : sexe === 'F' ? 'Féminin' : ''}<br />
               <strong>Lien de parenté :</strong> {LIEN_PARENTE_LABELS[lienParente as LienParenteApi] ?? lienParente}
               <br /><br />
-              <span className="text-destructive font-medium">⚠ Attention : une fois l'inscription enregistrée, vous ne pourrez plus modifier ces informations.</span>
+              <span className="text-destructive font-medium">⚠ Attention : une fois l'inscription enregistrée, vous pourrez corriger les informations depuis votre demande, sans changer votre rang.</span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

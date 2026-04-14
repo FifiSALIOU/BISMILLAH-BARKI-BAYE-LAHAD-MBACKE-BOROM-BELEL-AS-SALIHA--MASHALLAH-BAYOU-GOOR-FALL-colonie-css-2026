@@ -496,6 +496,57 @@ def reinscrire_desiste(*, db: Session, user: User, demande_id: int) -> DemandeIn
     return demande
 
 
+def parent_corriger_demande_sans_changer_rang(
+    *,
+    db: Session,
+    user: User,
+    demande_id: int,
+    prenom: str,
+    nom: str,
+    date_naissance: date,
+    sexe: Sexe,
+    lien_parente: LienParente,
+) -> DemandeInscription:
+    """Autorise le parent a corriger les infos enfant sans toucher au rang ni a la liste."""
+    raise_if_liste_finale_definitive()
+    parent = db.query(Parent).filter(Parent.user_id == user.id).first()
+    if not parent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent introuvable.")
+
+    demande = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(DemandeInscription.id == demande_id, Enfant.parent_id == parent.id)
+        .first()
+    )
+    if not demande:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande introuvable.")
+    _require_not_rejet_definitif(demande)
+    if demande.statut == DemandeStatut.DESISTEE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Correction impossible : demande deja desistee.",
+        )
+    if demande.desistement is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Correction impossible : annulez d'abord le desistement en cours.",
+        )
+
+    _validate_annee_naissance(date_naissance)
+    enfant = demande.enfant
+    enfant.prenom = (prenom or "").strip()[:191] or enfant.prenom
+    enfant.nom = (nom or "").strip()[:191] or enfant.nom
+    enfant.date_naissance = date_naissance
+    enfant.sexe = sexe
+    enfant.lien_parente = lien_parente
+    enfant.updated_at = datetime.now(timezone.utc)
+    demande.updated_at = datetime.now(timezone.utc)
+    db.flush()
+    db.refresh(demande)
+    return demande
+
+
 def admin_corriger_demande_rejetee(
     *,
     db: Session,

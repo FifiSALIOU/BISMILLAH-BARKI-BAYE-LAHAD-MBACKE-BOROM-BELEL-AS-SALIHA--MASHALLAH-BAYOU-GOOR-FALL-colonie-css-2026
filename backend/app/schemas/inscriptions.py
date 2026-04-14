@@ -31,6 +31,14 @@ class InscriptionCreateIn(BaseModel):
     enfant: EnfantCreateIn
 
 
+class EnfantCorrectionIn(BaseModel):
+    prenom: str = Field(min_length=1, max_length=255)
+    nom: str = Field(min_length=1, max_length=255)
+    date_naissance: date
+    sexe: Sexe
+    lien_parente: LienParente
+
+
 class TransparenceInscriptionOut(BaseModel):
     """Vue lecture seule pour les parents : toutes les demandes (transparence des listes)."""
 
