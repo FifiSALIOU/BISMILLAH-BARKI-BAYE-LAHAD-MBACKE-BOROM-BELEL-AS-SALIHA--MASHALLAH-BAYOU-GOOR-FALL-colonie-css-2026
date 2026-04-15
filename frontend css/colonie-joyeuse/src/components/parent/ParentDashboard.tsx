@@ -504,7 +504,7 @@ export default function ParentDashboard() {
   const noEnfantCharge = enfants.length === 0;
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8">
+    <div className="w-full max-w-5xl space-y-8 pl-[150px]">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Bienvenue, {parent.prenom} {parent.nom}</h1>
@@ -579,96 +579,27 @@ export default function ParentDashboard() {
       {/* Vos inscriptions - Cards with actions */}
       <div className="space-y-4">
         <h2 className="text-lg font-semibold text-foreground">Mes enfants</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid gap-4 w-full max-w-4xl">
           {enfants.map((enfant, i) => (
             <motion.div
               key={enfant.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 + 0.1 * i }}
-              className="rounded-xl border border-border p-5 bg-card cursor-pointer hover:shadow-md transition-shadow shadow-card"
+              className="w-full rounded-xl border border-border bg-card cursor-pointer hover:shadow-md transition-shadow shadow-card"
               onClick={() => handleCardClick(enfant)}
             >
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-2 h-2 rounded-full bg-accent" />
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Enfant</span>
-              </div>
-              <div className="space-y-2">
-                <p className="font-semibold text-foreground">{enfant.prenom} {enfant.nom}</p>
-                {/* Lien de parenté masqué à l'affichage (Père/Mère) à la demande.
-                <p className="text-sm text-muted-foreground">{calculateAge(enfant.dateNaissance)} ans — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'} — {enfant.lienParente}</p>
-                */}
-                <p className="text-sm text-muted-foreground">{calculateAge(enfant.dateNaissance)} ans — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'}</p>
-                  
-                  {/*
-                  Ancien affichage (le rang était toujours visible, y compris après désistement) :
-                  <div className="flex items-center gap-1.5">
-                    <Hash className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-xs font-medium text-muted-foreground">
-                      Rang <strong className="text-foreground">{getRangDansListeLocal(slot.enfant.id)}</strong> — {getListeLabel(slot.enfant.liste)}
-                    </span>
-                  </div>
-                  */}
-                  {/* Afficher Rang/Liste seulement après choix parent (Titulaire + Suppléant N1). */}
-                  {hasTitulaire && hasSuppleantN1 && (
-                    <div className="flex items-center gap-1.5">
-                      <Hash className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {enfant.desistement ? (
-                          getListeLabel(enfant.liste)
-                        ) : (
-                          <>
-                            Rang <strong className="text-foreground">{getRangDansListeLocal(enfant.id)}</strong> — {getListeLabel(enfant.liste)}
-                          </>
-                        )}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Statut badge */}
-                  <div className="flex flex-wrap gap-1.5">
+              <div className="p-4 space-y-2">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <p className="font-semibold text-foreground truncate">{enfant.prenom} {enfant.nom}</p>
                     <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${
                       !hasTitulaire ? 'bg-muted text-muted-foreground' : getStatutBadge(enfant.statut)
                     }`}>
                       {!hasTitulaire ? 'Non inscrit' : enfant.statut}
                     </span>
-                    {enfant.reinscrit && (
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-accent/10 text-accent border border-accent/20">Réinscrit</span>
-                    )}
                   </div>
-
-                  {/* Validation badge (rien si soumise sans refus) */}
-                  {getValidationBadge(enfant)}
-                  {enfant.rejetDefinitif && (
-                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold bg-destructive/15 text-destructive border border-destructive/25">
-                      Refus définitif — aucune action possible
-                    </span>
-                  )}
-
-                  {/* Désistement badges */}
-                  {enfant.desistement === 'demandé' && (
-                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700">⏳ Désistement en attente</span>
-                  )}
-                  {enfant.desistement === 'validé' && (
-                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive">Désisté</span>
-                  )}
-
-                  {/* Retenu badge */}
-                  {isInFinale(enfant.id) && !enfant.desistement && (
-                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1 w-fit">
-                      <Award className="w-3 h-3" /> Retenu(e) pour la colonie
-                    </span>
-                  )}
-
-                  {/* Action buttons */}
-                  <div className="flex gap-2 mt-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                    {/* Bouton "Modifier" masqué à la demande, sans supprimer la logique associée.
-                    {!inscriptionsCloturees && !enfant.rejetDefinitif && !enfant.desistement && !listeFinaleDefinitiveApi && (
-                      <Button variant="outline" size="sm" onClick={() => handleEditDemande(enfant)} className="rounded-lg gap-1 text-xs">
-                        <FilePenLine className="w-3 h-3" />Modifier
-                      </Button>
-                    )}
-                    */}
+                  <div className="flex gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
                     {!inscriptionsCloturees && enfant.lienParente !== 'Autre' && !enfant.desistement && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <>
                         <Button
@@ -705,6 +636,65 @@ export default function ParentDashboard() {
                       </Button>
                     )}
                   </div>
+                </div>
+                {/* Lien de parenté masqué à l'affichage (Père/Mère) à la demande.
+                <p className="text-sm text-muted-foreground">{calculateAge(enfant.dateNaissance)} ans — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'} — {enfant.lienParente}</p>
+                */}
+                <p className="text-sm text-muted-foreground">Né(e) le {new Date(enfant.dateNaissance).toLocaleDateString('fr-FR')} — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'}</p>
+                  
+                  {/*
+                  Ancien affichage (le rang était toujours visible, y compris après désistement) :
+                  <div className="flex items-center gap-1.5">
+                    <Hash className="w-3 h-3 text-muted-foreground" />
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Rang <strong className="text-foreground">{getRangDansListeLocal(slot.enfant.id)}</strong> — {getListeLabel(slot.enfant.liste)}
+                    </span>
+                  </div>
+                  */}
+                  {/* Afficher Rang/Liste seulement après choix parent (Titulaire + Suppléant N1). */}
+                  {hasTitulaire && hasSuppleantN1 && (
+                    <div className="flex items-center gap-1.5">
+                      <Hash className="w-3 h-3 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {enfant.desistement ? (
+                          getListeLabel(enfant.liste)
+                        ) : (
+                          <>
+                            Rang <strong className="text-foreground">{getRangDansListeLocal(enfant.id)}</strong> — {getListeLabel(enfant.liste)}
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {enfant.reinscrit && (
+                    <div className="flex flex-wrap gap-1.5">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-accent/10 text-accent border border-accent/20">Réinscrit</span>
+                    </div>
+                  )}
+
+                  {/* Validation badge (rien si soumise sans refus) */}
+                  {getValidationBadge(enfant)}
+                  {enfant.rejetDefinitif && (
+                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold bg-destructive/15 text-destructive border border-destructive/25">
+                      Refus définitif — aucune action possible
+                    </span>
+                  )}
+
+                  {/* Désistement badges */}
+                  {enfant.desistement === 'demandé' && (
+                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700">⏳ Désistement en attente</span>
+                  )}
+                  {enfant.desistement === 'validé' && (
+                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive">Désisté</span>
+                  )}
+
+                  {/* Retenu badge */}
+                  {isInFinale(enfant.id) && !enfant.desistement && (
+                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1 w-fit">
+                      <Award className="w-3 h-3" /> Retenu(e) pour la colonie
+                    </span>
+                  )}
 
                   {hasTitulaire && hasSuppleantN1 && (
                     <p className="text-[10px] text-muted-foreground/60 mt-1">Cliquez sur la carte pour voir sa position dans la liste</p>
