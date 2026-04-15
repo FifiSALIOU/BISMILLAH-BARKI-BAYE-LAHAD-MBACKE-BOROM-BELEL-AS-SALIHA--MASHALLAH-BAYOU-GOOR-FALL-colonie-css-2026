@@ -154,7 +154,7 @@ export default function ParentDashboard() {
   }, [allEnfants]);
   const allDesistes = inscriptionsCloturees && enfants.length > 0 && enfants.every(e => e.desistement === 'validé');
   const titulaire = enfants.find(e => e.statut === 'Titulaire');
-  const suppN1 = enfants.find(e => e.statut === 'Suppléant N1');
+  const suppN1 = enfants.find(e => e.liste === 'attente_n1');
   const suppN2 = enfants.find(e => e.statut === 'Suppléant N2');
 
   /** Identifiants de demandes réellement dans la liste finale publiée (après clôture) — pas la simple validation des infos. */
@@ -170,16 +170,25 @@ export default function ParentDashboard() {
     ? enfants.filter((e) => typeof e.demandeId === 'number' && demandeIdsListeFinaleRetenus.has(e.demandeId))
     : [];
 
-  const enfantN1 = enfants.find(e => e.statut === 'Suppléant N1' && !e.desistement);
+  const enfantN1 = enfants.find(e => e.liste === 'attente_n1' && !e.desistement);
   const hasTitulaire = enfants.some((e) => e.statut === 'Titulaire');
-  const hasSuppleantN1 = enfants.some((e) => e.statut === 'Suppléant N1');
+  const hasSuppleantN1 = enfants.some((e) => e.liste === 'attente_n1' && !e.desistement);
+  const isNonInscrit = (e: Enfant) =>
+    e.rangListe == null && e.liste === 'attente_n2' && e.lienParente !== 'Autre' && e.statut !== 'Titulaire';
+  const getDemandeIdForAction = (e: Enfant | undefined): number | null => {
+    if (!e) return null;
+    if (typeof e.demandeId === 'number' && Number.isFinite(e.demandeId)) return e.demandeId;
+    const fallback = Number(e.id);
+    return Number.isFinite(fallback) ? fallback : null;
+  };
 
   // Action handlers (same as MesEnfants - unchanged behavior)
   const handleSetTitulaire = (id: string, name: string) => { setSelectedId(id); setSelectedName(name); setConfirmOpen(true); };
   const confirmChange = async () => {
     const e = enfants.find((x) => x.id === selectedId);
+    const demandeId = getDemandeIdForAction(e);
     /** L’API `/parent/titulaire` attend en priorité l’id de la demande (`DemandeOut.id`). */
-    if (!e?.demandeId || !token) {
+    if (!demandeId || !token) {
       setConfirmOpen(false);
       return;
     }
@@ -187,7 +196,7 @@ export default function ParentDashboard() {
       await apiRequest('/parent/titulaire', {
         method: 'POST',
         token,
-        body: JSON.stringify({ enfant_id_titulaire: e.demandeId }),
+        body: JSON.stringify({ enfant_id_titulaire: demandeId }),
       });
       await loadAll();
       addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Changement titulaire', details: `A défini ${selectedName} comme titulaire`, cible: selectedName });
@@ -204,12 +213,13 @@ export default function ParentDashboard() {
   const isTitulaireDesistement = desistementTarget?.statut === 'Titulaire';
 
   const handleSwapAndDesist = async () => {
-    if (!enfantN1?.demandeId || !token) return;
+    const demandeId = getDemandeIdForAction(enfantN1);
+    if (!demandeId || !token) return;
     try {
       await apiRequest('/parent/titulaire', {
         method: 'POST',
         token,
-        body: JSON.stringify({ enfant_id_titulaire: enfantN1.demandeId }),
+        body: JSON.stringify({ enfant_id_titulaire: demandeId }),
       });
       await loadAll();
       addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Changement titulaire', details: `A défini ${enfantN1.prenom} ${enfantN1.nom} comme titulaire avant désistement`, cible: `${enfantN1.prenom} ${enfantN1.nom}` });
@@ -276,13 +286,14 @@ export default function ParentDashboard() {
 
   const setAsSuppleantN1 = async (id: string) => {
     const current = enfants.find((e) => e.id === id);
+    const demandeId = getDemandeIdForAction(current);
     if (!current || !token) return;
-    if (!current.demandeId) return;
+    if (!demandeId) return;
     try {
       await apiRequest('/parent/suppleant-n1', {
         method: 'POST',
         token,
-        body: JSON.stringify({ enfant_id_titulaire: current.demandeId }),
+        body: JSON.stringify({ enfant_id_titulaire: demandeId }),
       });
       await loadAll();
     } catch (err) {
@@ -504,7 +515,7 @@ export default function ParentDashboard() {
   const noEnfantCharge = enfants.length === 0;
 
   return (
-    <div className="w-full max-w-5xl space-y-8 pl-[150px]">
+    <div className="w-full max-w-5xl space-y-8 pl-[170px]">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Bienvenue, {parent.prenom} {parent.nom}</h1>
@@ -594,13 +605,13 @@ export default function ParentDashboard() {
                   <div className="flex items-center gap-2 min-w-0">
                     <p className="font-semibold text-foreground truncate">{enfant.prenom} {enfant.nom}</p>
                     <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${
-                      !hasTitulaire ? 'bg-muted text-muted-foreground' : getStatutBadge(enfant.statut)
+                      (!hasTitulaire || isNonInscrit(enfant)) ? 'bg-muted text-muted-foreground' : getStatutBadge(enfant.statut)
                     }`}>
-                      {!hasTitulaire ? 'Non inscrit' : enfant.statut}
+                      {(!hasTitulaire || isNonInscrit(enfant)) ? 'Non inscrit' : enfant.statut}
                     </span>
                   </div>
                   <div className="flex gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                    {!inscriptionsCloturees && enfant.lienParente !== 'Autre' && !enfant.desistement && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
+                    {!inscriptionsCloturees && enfant.lienParente !== 'Autre' && !enfant.desistement && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && enfant.statut !== 'Titulaire' && (
                       <>
                         <Button
                           variant="default"
@@ -611,16 +622,16 @@ export default function ParentDashboard() {
                           Titulaire
                         </Button>
                         <Button
-                          variant={enfant.statut !== 'Titulaire' ? 'default' : 'outline'}
+                          variant="outline"
                           size="sm"
                           onClick={() => { void setAsSuppleantN1(enfant.id); }}
-                          className="rounded-lg gap-1 text-xs"
+                          className="rounded-lg gap-1 text-xs !bg-transparent hover:!bg-transparent !text-foreground hover:!text-foreground"
                         >
                           Suppléant N1
                         </Button>
                       </>
                     )}
-                    {hasTitulaire && hasSuppleantN1 && !enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
+                    {enfant.statut === 'Titulaire' && !enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <Button variant="outline" size="sm" onClick={() => handleDesistement(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
                         <HandMetal className="w-3 h-3" />Désistement
                       </Button>

@@ -76,7 +76,7 @@ function listeFromCode(code: string): Enfant['liste'] {
 
 /** Libellé de statut comme à l’écran « Gestion des listes » (dérivé de `liste_code`). */
 function statutFromDemande(d: { liste_code: string }): Enfant['statut'] {
-  if (d.liste_code === 'NON_INSCRIT') return 'Suppléant N1';
+  if (d.liste_code === 'NON_INSCRIT') return 'Suppléant N2';
   return statutLabelFromListeUi(listeApiToUi(d.liste_code));
 }
 
