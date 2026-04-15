@@ -512,12 +512,14 @@ export default function ParentDashboard() {
             Matricule : <span className="font-mono tabular-nums text-foreground">{parent.matricule}</span> — {parent.service}
           </p>
         </div>
+        {/* Bouton "Inscrire un enfant" masqué à la demande.
         {canInscrire && (
           <Button onClick={() => setInscrireOpen(true)} className="rounded-lg bg-accent text-white hover:bg-accent/90 gap-2">
             <UserPlus className="w-4 h-4" />
             {noEnfantCharge ? 'Inscrire un enfant (non biologique)' : 'Inscrire un enfant'}
           </Button>
         )}
+        */}
       </motion.div>
 
       {/* Bandeau inscriptions clôturées */}
@@ -556,6 +558,7 @@ export default function ParentDashboard() {
         </motion.div>
       )}
 
+      {/* Bloc statistiques parent masqué à la demande.
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
           { label: 'Enfants inscrits', value: enfants.length, max: MAX, icon: Users, color: 'text-primary' },
@@ -571,10 +574,11 @@ export default function ParentDashboard() {
           </motion.div>
         ))}
       </div>
+      */}
 
       {/* Vos inscriptions - Cards with actions */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-foreground">Vos inscriptions</h2>
+        <h2 className="text-lg font-semibold text-foreground">Mes enfants</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {enfants.map((enfant, i) => (
             <motion.div
@@ -591,7 +595,10 @@ export default function ParentDashboard() {
               </div>
               <div className="space-y-2">
                 <p className="font-semibold text-foreground">{enfant.prenom} {enfant.nom}</p>
+                {/* Lien de parenté masqué à l'affichage (Père/Mère) à la demande.
                 <p className="text-sm text-muted-foreground">{calculateAge(enfant.dateNaissance)} ans — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'} — {enfant.lienParente}</p>
+                */}
+                <p className="text-sm text-muted-foreground">{calculateAge(enfant.dateNaissance)} ans — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'}</p>
                   
                   {/*
                   Ancien affichage (le rang était toujours visible, y compris après désistement) :
