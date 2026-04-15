@@ -142,6 +142,16 @@ class DemandeInscription(Base):
     )
     non_validation_reason: Mapped[str] = mapped_column("motif_rejet", String(191), nullable=False)
     rejet_definitif: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    justificatif_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    justificatif_nom_fichier: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    justificatif_mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    justificatif_taille: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    justificatif_uploaded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    justificatif_valide: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    justificatif_valide_par_user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id"), nullable=True
+    )
+    justificatif_valide_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     liste_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("listes.id"), nullable=False)
     enfant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("enfants.id"), nullable=False)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
