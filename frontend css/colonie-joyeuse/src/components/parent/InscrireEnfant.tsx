@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInscription } from '@/contexts/InscriptionContext';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { AlertTriangle, CheckCircle2, UserPlus, Star, Clock, PartyPopper } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, UserPlus, Star, Clock, PartyPopper, X } from 'lucide-react';
 import { apiRequest } from '@/lib/api';
 
 /** Valeurs attendues par l'API (`LienParente`) — libellés FR pour l'affichage */
@@ -47,7 +47,11 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
   const [showNextPrompt, setShowNextPrompt] = useState(false);
   const [showMaxReachedPopup, setShowMaxReachedPopup] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
-  const [justificatifFile, setJustificatifFile] = useState<File | null>(null);
+  const [justificatifFiles, setJustificatifFiles] = useState<File[]>([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewName, setPreviewName] = useState('');
+  const [previewMime, setPreviewMime] = useState('');
 
   if (!parent) return null;
 
@@ -73,7 +77,24 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
 
   const resetForm = () => {
     setPrenom(''); setNom(''); setDateNaissance(''); setDateNaissanceError(''); setSexe(''); setLienParente('');
+    setJustificatifFiles([]);
   };
+
+  const previewLocalFile = (file: File) => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    setPreviewName(file.name);
+    setPreviewMime(file.type || '');
+    setPreviewOpen(true);
+  };
+
+  useEffect(() => {
+    if (!previewOpen && previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+    }
+  }, [previewOpen, previewUrl]);
 
   const handleSubmit = () => {
     if (MAX_ENFANTS !== null && nbInscrits >= MAX_ENFANTS) {
@@ -82,13 +103,13 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
       setErrorOpen(true);
       return;
     }
-    if (!prenom.trim() || !nom.trim() || !dateNaissance || !sexe || (!nonBiologiqueMode && !lienParente) || !telephone.trim()) {
+    if (!prenom.trim() || !nom.trim() || !dateNaissance || !sexe || (!nonBiologiqueMode && !lienParente) || (!nonBiologiqueMode && !telephone.trim())) {
       setErrorTitle("Champs requis");
       setErrorMessage("Veuillez remplir tous les champs obligatoires du formulaire.");
       setErrorOpen(true);
       return;
     }
-    if (nonBiologiqueMode && !justificatifFile) {
+    if (nonBiologiqueMode && justificatifFiles.length === 0) {
       setErrorTitle("Document requis");
       setErrorMessage("Veuillez joindre un document justificatif (extrait de naissance ou certificat de scolarité).");
       setErrorOpen(true);
@@ -132,9 +153,7 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
         formData.append('enfant_nom', nom.trim());
         formData.append('enfant_date_naissance', dateNaissance);
         formData.append('enfant_sexe', sexe as 'M' | 'F');
-        if (justificatifFile) {
-          formData.append('justificatif', justificatifFile);
-        }
+        justificatifFiles.forEach((file) => formData.append('justificatif', file));
         await apiRequest('/parent/inscriptions-n2', {
           method: 'POST',
           token,
@@ -222,13 +241,15 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className={`mx-auto space-y-6 ${nonBiologiqueMode ? 'max-w-xl' : 'max-w-3xl'}`}>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold text-foreground">Inscrire un enfant</h1>
-        <p className="text-muted-foreground mt-1">Inscription {nbInscrits + 1}/{MAX_ENFANTS ?? '∞'} — Colonie de Vacances 2026</p>
+        {!nonBiologiqueMode && (
+          <p className="text-muted-foreground mt-1">Inscription {nbInscrits + 1}/{MAX_ENFANTS ?? '∞'} — Colonie de Vacances 2026</p>
+        )}
       </motion.div>
 
-      {MAX_ENFANTS !== null && (
+      {!nonBiologiqueMode && MAX_ENFANTS !== null && (
         <div className="flex gap-2">
           {Array.from({ length: MAX_ENFANTS }).map((_, i) => (
             <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i < nbInscrits ? 'bg-emerald-500' : i === nbInscrits ? 'bg-accent' : 'bg-muted'}`} />
@@ -237,15 +258,18 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
       )}
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card rounded-xl shadow-card border border-border overflow-hidden">
-        <div className="bg-muted/50 px-6 py-3 border-b border-border flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <currentChildLabel.icon className="w-4 h-4 text-foreground" />
-            <span className="font-semibold text-sm text-foreground">{currentChildLabel.title}</span>
+        {!nonBiologiqueMode && (
+          <div className="bg-muted/50 px-6 py-3 border-b border-border flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <currentChildLabel.icon className="w-4 h-4 text-foreground" />
+              <span className="font-semibold text-sm text-foreground">{currentChildLabel.title}</span>
+            </div>
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${currentChildLabel.color}`}>{currentChildLabel.badge}</span>
           </div>
-          <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${currentChildLabel.color}`}>{currentChildLabel.badge}</span>
-        </div>
+        )}
 
-        <div className="p-6 space-y-8">
+        <div className={`p-6 ${nonBiologiqueMode ? 'space-y-4' : 'space-y-8'}`}>
+          {!nonBiologiqueMode && (
           <div>
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Informations du parent</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -279,19 +303,22 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
               </div>
             </div>
           </div>
+          )}
 
           <div>
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
-              Informations de l'enfant
-              {nbInscrits === 0 && <span className="ml-2 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md normal-case">Enfant Titulaire</span>}
-            </h3>
+            {!nonBiologiqueMode && (
+              <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
+                Informations de l'enfant
+                {nbInscrits === 0 && <span className="ml-2 text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md normal-case">Enfant Titulaire</span>}
+              </h3>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-foreground">Prénom de l'enfant *</Label>
+                <Label className="text-foreground">{nonBiologiqueMode ? 'Prénom' : "Prénom de l'enfant"} *</Label>
                 <Input value={prenom} onChange={e => setPrenom(e.target.value)} placeholder="Prénom" className="h-11 rounded-lg" />
               </div>
               <div className="space-y-2">
-                <Label className="text-foreground">Nom de l'enfant *</Label>
+                <Label className="text-foreground">{nonBiologiqueMode ? 'Nom' : "Nom de l'enfant"} *</Label>
                 <Input value={nom} onChange={e => setNom(e.target.value)} placeholder="Nom" className="h-11 rounded-lg" />
               </div>
               <div className="space-y-2">
@@ -309,7 +336,8 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2 sm:col-span-2">
+              {!nonBiologiqueMode && (
+                <div className="space-y-2 sm:col-span-2">
                 <Label className="text-foreground">Lien de parenté *</Label>
                 <Select value={lienParente} onValueChange={(value) => setLienParente(value as LienParenteApi)}>
                   <SelectTrigger className="h-11 rounded-lg"><SelectValue placeholder="Sélectionner le lien" /></SelectTrigger>
@@ -326,28 +354,56 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
                   <p className="text-xs text-accent mt-1">⚠ Cet enfant sera placé en Liste d'Attente N°2.</p>
                 ) : null}
               </div>
+              )}
               {nonBiologiqueMode && (
                 <div className="space-y-2 sm:col-span-2">
-                  <Label className="text-foreground">Document justificatif *</Label>
+                  <Label className="text-foreground">Lien de parenté</Label>
+                  <Input value="Autre" disabled className="h-11 rounded-lg bg-muted/50" />
+                </div>
+              )}
+              {nonBiologiqueMode && (
+                <div className="space-y-2 sm:col-span-2">
+                  <Label className="text-foreground">Document justificatif (Extrait de naissance ou Certificat de scolarité)</Label>
+                  <p className="text-xs text-muted-foreground">Téléverser / Uploader un ou plusieurs fichiers (exemple : recto et verso).</p>
                   <Input
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => setJustificatifFile(e.target.files?.[0] ?? null)}
+                    multiple
+                    onChange={(e) => setJustificatifFiles(Array.from(e.target.files ?? []))}
                     className="h-11 rounded-lg"
                   />
-                  <p className="text-xs text-muted-foreground">Extrait de naissance ou certificat de scolarité.</p>
+                  {justificatifFiles.length > 0 && (
+                    <div className="space-y-1">
+                      {justificatifFiles.map((file, idx) => (
+                        <button
+                          key={`${file.name}-${idx}`}
+                          type="button"
+                          onClick={() => previewLocalFile(file)}
+                          className="block text-left text-xs text-accent hover:underline"
+                        >
+                          Voir le fichier : {file.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-4 border-t border-border">
-            <Button variant="outline" onClick={resetForm} className="rounded-lg">Annuler</Button>
-            <Button onClick={handleSubmit} disabled={isDateInvalid} className="rounded-lg bg-accent text-white hover:bg-accent/90 gap-2 disabled:opacity-50">
-              <UserPlus className="w-4 h-4" />
-              Enregistrer l'inscription
+          {nonBiologiqueMode ? (
+            <Button onClick={handleSubmit} disabled={isDateInvalid} className="w-full rounded-lg bg-accent text-white hover:bg-accent/90 disabled:opacity-50">
+              Soumettre la demande
             </Button>
-          </div>
+          ) : (
+            <div className="flex justify-end gap-3 pt-4 border-t border-border">
+              <Button variant="outline" onClick={resetForm} className="rounded-lg">Annuler</Button>
+              <Button onClick={handleSubmit} disabled={isDateInvalid} className="rounded-lg bg-accent text-white hover:bg-accent/90 gap-2 disabled:opacity-50">
+                <UserPlus className="w-4 h-4" />
+                Enregistrer l'inscription
+              </Button>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -427,6 +483,32 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
           <DialogFooter className="justify-center pt-2">
             <Button onClick={() => setShowMaxReachedPopup(false)} className="rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 px-8">C'est compris !</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="sm:max-w-3xl rounded-xl p-0 overflow-hidden">
+          <div className="relative bg-card">
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(false)}
+              className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+              aria-label="Fermer l'aperçu"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="px-5 py-4 border-b border-border">
+              <DialogTitle className="text-base text-foreground">Aperçu du fichier</DialogTitle>
+              <DialogDescription className="pt-1">{previewName}</DialogDescription>
+            </div>
+            <div className="p-4 bg-muted/20">
+              {previewUrl && previewMime.startsWith('image/') ? (
+                <img src={previewUrl} alt={previewName} className="max-h-[70vh] w-full object-contain rounded-md bg-background" />
+              ) : previewUrl ? (
+                <iframe src={previewUrl} title={previewName} className="w-full h-[70vh] rounded-md bg-background" />
+              ) : null}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

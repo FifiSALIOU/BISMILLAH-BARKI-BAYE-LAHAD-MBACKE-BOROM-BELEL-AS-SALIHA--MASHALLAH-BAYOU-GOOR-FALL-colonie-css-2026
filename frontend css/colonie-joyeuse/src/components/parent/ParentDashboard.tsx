@@ -589,7 +589,7 @@ export default function ParentDashboard() {
 
       {/* Vos inscriptions - Cards with actions */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-foreground">Mes enfants</h2>
+        {!noEnfantCharge && <h2 className="text-lg font-semibold text-foreground">Mes enfants</h2>}
         {noEnfantCharge && (
           <div className="max-w-4xl space-y-4">
             <div className="rounded-xl border border-amber-300/90 bg-amber-50/40 p-5">

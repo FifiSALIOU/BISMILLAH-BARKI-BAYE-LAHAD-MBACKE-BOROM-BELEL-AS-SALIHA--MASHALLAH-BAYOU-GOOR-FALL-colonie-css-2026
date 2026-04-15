@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from pathlib import Path
 from uuid import uuid4
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
@@ -63,6 +64,38 @@ def _save_justificatif_file(upload: UploadFile) -> tuple[str, str, str | None, i
     content = upload.file.read()
     target.write_bytes(content)
     return (str(target), safe_name[:255], upload.content_type, len(content))
+
+
+def _save_justificatifs_files(uploads: list[UploadFile]) -> tuple[str, str, str | None, int]:
+    valid_uploads = [u for u in uploads if u is not None and (u.filename or "").strip() != ""]
+    if not valid_uploads:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Veuillez joindre au moins un document justificatif.",
+        )
+
+    if len(valid_uploads) == 1:
+        return _save_justificatif_file(valid_uploads[0])
+
+    _JUSTIFICATIFS_DIR.mkdir(parents=True, exist_ok=True)
+    zip_name = f"{uuid4().hex}_justificatifs.zip"
+    target = _JUSTIFICATIFS_DIR / zip_name
+    used_names: set[str] = set()
+
+    with ZipFile(target, mode="w", compression=ZIP_DEFLATED) as zf:
+        for idx, upload in enumerate(valid_uploads, start=1):
+            original = (upload.filename or f"document_{idx}").strip() or f"document_{idx}"
+            safe_name = original.replace("\\", "_").replace("/", "_")
+            candidate = safe_name
+            suffix = 1
+            while candidate in used_names:
+                suffix += 1
+                candidate = f"{Path(safe_name).stem}_{suffix}{Path(safe_name).suffix}"
+            used_names.add(candidate)
+            content = upload.file.read()
+            zf.writestr(candidate, content)
+
+    return (str(target), "justificatifs.zip", "application/zip", target.stat().st_size)
 
 
 @router.post("/inscriptions", response_model=DemandeOut)
@@ -132,7 +165,7 @@ def creer_inscription_non_biologique_n2(
     enfant_nom: str = Form(...),
     enfant_date_naissance: date = Form(...),
     enfant_sexe: str = Form(...),
-    justificatif: UploadFile = File(...),
+    justificatif: list[UploadFile] = File(...),
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.PARENT)),
 ) -> DemandeOut:
@@ -160,7 +193,7 @@ def creer_inscription_non_biologique_n2(
     if target_liste is None:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste N2 introuvable.")
 
-    path, nom_fichier, mime, taille = _save_justificatif_file(justificatif)
+    path, nom_fichier, mime, taille = _save_justificatifs_files(justificatif)
     enfant = Enfant(
         parent_id=parent.id,
         prenom=enfant_prenom.strip()[:191],
