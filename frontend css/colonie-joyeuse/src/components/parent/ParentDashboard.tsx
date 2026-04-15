@@ -613,27 +613,33 @@ export default function ParentDashboard() {
                   <div className="flex gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
                     {!inscriptionsCloturees && enfant.lienParente !== 'Autre' && !enfant.desistement && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && enfant.statut !== 'Titulaire' && (
                       <>
-                        {!hasTitulaire && (
+                        {(!hasTitulaire || enfant.statut === 'Suppléant N1') && (
                           <Button
-                            variant="default"
+                            variant={enfant.statut === 'Suppléant N1' ? 'outline' : 'default'}
                             size="sm"
                             onClick={() => handleSetTitulaire(enfant.id, `${enfant.prenom} ${enfant.nom}`)}
-                            className="rounded-lg gap-1 text-xs !bg-[#f5a623] !border-[#f5a623] !text-white hover:!bg-[#e39a1f]"
+                            className={
+                              enfant.statut === 'Suppléant N1'
+                                ? 'rounded-lg gap-1 text-xs'
+                                : 'rounded-lg gap-1 text-xs !bg-[#f5a623] !border-[#f5a623] !text-white hover:!bg-[#e39a1f]'
+                            }
                           >
-                            Titulaire
+                            {enfant.statut === 'Suppléant N1' ? <><ArrowUpDown className="w-3 h-3" />Définir titulaire</> : 'Titulaire'}
                           </Button>
                         )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => { void setAsSuppleantN1(enfant.id); }}
-                          className="rounded-lg gap-1 text-xs !bg-transparent hover:!bg-transparent !text-foreground hover:!text-foreground"
-                        >
-                          Suppléant N1
-                        </Button>
+                        {enfant.statut !== 'Suppléant N1' && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => { void setAsSuppleantN1(enfant.id); }}
+                            className="rounded-lg gap-1 text-xs !bg-transparent hover:!bg-transparent !text-foreground hover:!text-foreground"
+                          >
+                            Suppléant N1
+                          </Button>
+                        )}
                       </>
                     )}
-                    {enfant.statut === 'Titulaire' && !enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
+                    {hasTitulaire && hasSuppleantN1 && (enfant.statut === 'Titulaire' || enfant.statut === 'Suppléant N1') && !enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <Button variant="outline" size="sm" onClick={() => handleDesistement(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
                         <HandMetal className="w-3 h-3" />Désistement
                       </Button>
