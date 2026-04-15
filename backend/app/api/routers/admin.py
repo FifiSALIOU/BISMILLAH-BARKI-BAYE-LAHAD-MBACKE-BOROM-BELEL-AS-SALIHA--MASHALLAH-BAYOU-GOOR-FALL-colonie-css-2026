@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, text
 from sqlalchemy.orm import Session, joinedload
@@ -496,6 +497,12 @@ def list_demandes_par_liste(
                 "lien_parente": e.lien_parente.value,
                 "is_titulaire": e.is_titulaire,
             },
+            "justificatif_nom_fichier": d.justificatif_nom_fichier,
+            "justificatif_mime_type": d.justificatif_mime_type,
+            "justificatif_taille": d.justificatif_taille,
+            "justificatif_uploaded_at": d.justificatif_uploaded_at.isoformat() if d.justificatif_uploaded_at else None,
+            "justificatif_valide": d.justificatif_valide,
+            "justificatif_valide_at": d.justificatif_valide_at.isoformat() if d.justificatif_valide_at else None,
         }
 
     return [_row(d) for d in demandes]
@@ -535,6 +542,12 @@ def _row_rejet_admin(d: DemandeInscription) -> dict:
             "lien_parente": e.lien_parente.value,
             "is_titulaire": e.is_titulaire,
         },
+        "justificatif_nom_fichier": d.justificatif_nom_fichier,
+        "justificatif_mime_type": d.justificatif_mime_type,
+        "justificatif_taille": d.justificatif_taille,
+        "justificatif_uploaded_at": d.justificatif_uploaded_at.isoformat() if d.justificatif_uploaded_at else None,
+        "justificatif_valide": d.justificatif_valide,
+        "justificatif_valide_at": d.justificatif_valide_at.isoformat() if d.justificatif_valide_at else None,
     }
 
 
@@ -592,7 +605,88 @@ def _row_demande_lecture_admin(d: DemandeInscription) -> dict:
             "lien_parente": e.lien_parente.value,
             "is_titulaire": e.is_titulaire,
         },
+        "justificatif_nom_fichier": d.justificatif_nom_fichier,
+        "justificatif_mime_type": d.justificatif_mime_type,
+        "justificatif_taille": d.justificatif_taille,
+        "justificatif_uploaded_at": d.justificatif_uploaded_at.isoformat() if d.justificatif_uploaded_at else None,
+        "justificatif_valide": d.justificatif_valide,
+        "justificatif_valide_at": d.justificatif_valide_at.isoformat() if d.justificatif_valide_at else None,
     }
+
+
+@router.get("/demandes/{demande_id}/justificatif")
+def get_justificatif_file(
+    demande_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
+):
+    _ = user
+    demande = db.query(DemandeInscription).filter(DemandeInscription.id == demande_id).first()
+    if not demande:
+        raise HTTPException(status_code=404, detail="Demande introuvable.")
+    if not demande.justificatif_path:
+        raise HTTPException(status_code=404, detail="Aucun justificatif disponible pour cette demande.")
+    path = str(demande.justificatif_path)
+    return FileResponse(
+        path=path,
+        media_type=demande.justificatif_mime_type or "application/octet-stream",
+        filename=demande.justificatif_nom_fichier or "justificatif",
+    )
+
+
+@router.post("/demandes/{demande_id}/valider-justificatif")
+def valider_justificatif_demande(
+    demande_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
+):
+    raise_if_liste_finale_definitive()
+    demande = db.query(DemandeInscription).filter(DemandeInscription.id == demande_id).first()
+    if not demande:
+        raise HTTPException(status_code=404, detail="Demande introuvable.")
+    if not demande.justificatif_path:
+        raise HTTPException(status_code=400, detail="Aucun justificatif associé à cette demande.")
+
+    enfant = demande.enfant
+    if enfant.date_naissance.year < 2012 or enfant.date_naissance.year > 2019:
+        raise HTTPException(
+            status_code=400,
+            detail="Validation impossible : date de naissance hors plage 2012-2019.",
+        )
+
+    when = datetime.now(timezone.utc)
+    demande.justificatif_valide = True
+    demande.justificatif_valide_par_user_id = user.id
+    demande.justificatif_valide_at = when
+    demande.statut = DemandeStatut.RETENUE
+    demande.non_validation_reason = ""
+    demande.rejet_definitif = False
+    demande.updated_at = when
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/demandes/{demande_id}/refuser-justificatif")
+def refuser_justificatif_demande(
+    demande_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN)),
+):
+    raise_if_liste_finale_definitive()
+    demande = db.query(DemandeInscription).filter(DemandeInscription.id == demande_id).first()
+    if not demande:
+        raise HTTPException(status_code=404, detail="Demande introuvable.")
+
+    when = datetime.now(timezone.utc)
+    demande.justificatif_valide = False
+    demande.justificatif_valide_par_user_id = user.id
+    demande.justificatif_valide_at = when
+    demande.statut = DemandeStatut.NON_VALIDEE
+    demande.non_validation_reason = "Date de naissance hors plage 2012-2019 (justificatif refusé)."
+    demande.rejet_definitif = True
+    demande.updated_at = when
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/demandes/desistees")

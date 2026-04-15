@@ -43,6 +43,8 @@ type Enfant = {
   parentTelephone?: string;
   rang: number;
   reinscrit?: boolean;
+  justificatifNomFichier?: string | null;
+  justificatifValide?: boolean | null;
 };
 
 const calculateAge = (dateNaissance: string): number => {
@@ -146,6 +148,8 @@ export default function GestionListe({ type }: Props) {
         parentAgence: d.parent_site || '',
         rang: d.rang || 0,
         reinscrit: !!d.is_reinscrit,
+        justificatifNomFichier: d.justificatif_nom_fichier ?? null,
+        justificatifValide: d.justificatif_valide ?? null,
       };
         })
         /** Désistements validés : visibles uniquement dans « Demandes désistées », pas dans P / N1 / N2. */
@@ -248,6 +252,43 @@ export default function GestionListe({ type }: Props) {
     addHistorique({ utilisateur: 'Gestionnaire', role: 'Admin', action: 'Refus', details: `A refusé la demande de ${refusTarget.prenom} ${refusTarget.nom}. Motif : ${motifRefus.trim()}`, cible: `${refusTarget.prenom} ${refusTarget.nom}` });
     toast({ title: '❌ Demande refusée', description: `${refusTarget.prenom} ${refusTarget.nom} — Motif : ${motifRefus}` });
     setRefusOpen(false); setRefusTarget(null); setMotifRefus('');
+    setRefreshTick((t) => t + 1);
+  };
+
+  const handleVoirJustificatif = (enfant: Enfant) => {
+    if (!token) return;
+    const base = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+    fetch(`${base}/admin/demandes/${enfant.demandeId}/justificatif`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Impossible de télécharger le justificatif.');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
+      })
+      .catch((err) => {
+        toast({ title: 'Erreur', description: err instanceof Error ? err.message : 'Erreur justificatif', variant: 'destructive' });
+      });
+  };
+
+  const handleValiderJustificatif = async (enfant: Enfant) => {
+    if (!token) return;
+    await apiRequest(`/admin/demandes/${enfant.demandeId}/valider-justificatif`, {
+      method: 'POST',
+      token,
+    });
+    toast({ title: '✅ Justificatif validé' });
+    setRefreshTick((t) => t + 1);
+  };
+
+  const handleRefuserJustificatif = async (enfant: Enfant) => {
+    if (!token) return;
+    await apiRequest(`/admin/demandes/${enfant.demandeId}/refuser-justificatif`, {
+      method: 'POST',
+      token,
+    });
+    toast({ title: '❌ Justificatif refusé (définitif)' });
     setRefreshTick((t) => t + 1);
   };
 
@@ -418,6 +459,21 @@ export default function GestionListe({ type }: Props) {
                           <Button size="sm" variant="ghost" onClick={() => setDetailEnfant(e)} className="gap-1 text-xs rounded-lg h-7 px-2">
                             <Eye className="w-3 h-3" />Détails
                           </Button>
+                          {type === 'attente_n2' && !!e.justificatifNomFichier && (
+                            <Button size="sm" variant="ghost" onClick={() => handleVoirJustificatif(e)} className="gap-1 text-xs rounded-lg h-7 px-2">
+                              <Eye className="w-3 h-3" />Justificatif
+                            </Button>
+                          )}
+                          {type === 'attente_n2' && !!e.justificatifNomFichier && e.justificatifValide == null && (
+                            <>
+                              <Button size="sm" onClick={() => handleValiderJustificatif(e)} className="gap-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2">
+                                <CheckCircle2 className="w-3 h-3" />Valider doc
+                              </Button>
+                              <Button size="sm" onClick={() => handleRefuserJustificatif(e)} className="gap-1 text-xs rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground h-7 px-2">
+                                <ThumbsDown className="w-3 h-3" />Refuser doc
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>

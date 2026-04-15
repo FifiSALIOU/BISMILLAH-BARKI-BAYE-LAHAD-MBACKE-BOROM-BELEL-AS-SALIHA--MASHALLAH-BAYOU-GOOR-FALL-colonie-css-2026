@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 from datetime import date, datetime, timezone
+from pathlib import Path
+from uuid import uuid4
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import require_roles
 from app.db.session import get_db
-from app.models.enums import DemandeStatut, ListeCode, UserRole
-from app.models.models import DemandeInscription, Enfant, Parent, User
+from app.models.enums import DemandeStatut, LienParente, ListeCode, Sexe, UserRole
+from app.models.models import DemandeInscription, Enfant, Liste, Parent, User
 from app.schemas.inscriptions import (
     DemandeOut,
     DesistementRequestIn,
@@ -20,6 +22,8 @@ from app.schemas.inscriptions import (
 )
 from app.services.historique_metier import append_historique_best_effort
 from app.services.inscriptions import (
+    _next_rang_for_liste,
+    auto_sync_enfants_eligibles_du_parent,
     cancel_desistement,
     create_inscription_for_parent_user,
     ensure_listes_exist,
@@ -44,6 +48,20 @@ from app.services.email_templates import (
 )
 
 router = APIRouter(prefix="/parent", tags=["parent"])
+
+
+_JUSTIFICATIFS_DIR = Path(__file__).resolve().parents[3] / "data" / "justificatifs"
+
+
+def _save_justificatif_file(upload: UploadFile) -> tuple[str, str, str | None, int]:
+    _JUSTIFICATIFS_DIR.mkdir(parents=True, exist_ok=True)
+    original = (upload.filename or "document").strip() or "document"
+    safe_name = original.replace("\\", "_").replace("/", "_")
+    unique_name = f"{uuid4().hex}_{safe_name}"
+    target = _JUSTIFICATIFS_DIR / unique_name
+    content = upload.file.read()
+    target.write_bytes(content)
+    return (str(target), safe_name[:255], upload.content_type, len(content))
 
 
 @router.post("/inscriptions", response_model=DemandeOut)
@@ -107,6 +125,74 @@ def creer_inscription(
     return out
 
 
+@router.post("/inscriptions-n2", response_model=DemandeOut)
+def creer_inscription_non_biologique_n2(
+    enfant_prenom: str = Form(...),
+    enfant_nom: str = Form(...),
+    enfant_date_naissance: date = Form(...),
+    enfant_sexe: str = Form(...),
+    justificatif: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.PARENT)),
+) -> DemandeOut:
+    parent = db.query(Parent).filter(Parent.user_id == user.id).first()
+    if parent is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent introuvable.")
+
+    # Réservé au cas N2 demandé : parent sans enfants biologiques préchargés.
+    if db.query(Enfant).filter(Enfant.parent_id == parent.id).first() is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cette action est réservée aux parents sans enfant préchargé.",
+        )
+
+    if enfant_sexe not in ("M", "F"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sexe invalide.")
+    if enfant_date_naissance.year < 2012 or enfant_date_naissance.year > 2019:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Date de naissance invalide : elle doit être comprise entre 2012 et 2019.",
+        )
+
+    ensure_listes_exist(db)
+    target_liste = db.query(Liste).filter(Liste.code == ListeCode.ATTENTE_N2).first()
+    if target_liste is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste N2 introuvable.")
+
+    path, nom_fichier, mime, taille = _save_justificatif_file(justificatif)
+    enfant = Enfant(
+        parent_id=parent.id,
+        prenom=enfant_prenom.strip()[:191],
+        nom=enfant_nom.strip()[:191],
+        date_naissance=enfant_date_naissance,
+        sexe=Sexe.M if enfant_sexe == "M" else Sexe.F,
+        lien_parente=LienParente.AUTRE,
+        is_titulaire=False,
+    )
+    db.add(enfant)
+    db.flush()
+
+    rang = _next_rang_for_liste(db, int(target_liste.id))
+    demande = DemandeInscription(
+        enfant_id=enfant.id,
+        liste_id=target_liste.id,
+        rang_dans_liste=rang,
+        date_inscription=date.today(),
+        statut=DemandeStatut.SOUMISE,
+        non_validation_reason="",
+        user_id=user.id,
+        justificatif_path=path,
+        justificatif_nom_fichier=nom_fichier,
+        justificatif_mime_type=(mime or "")[:100] or None,
+        justificatif_taille=taille,
+        justificatif_uploaded_at=datetime.now(timezone.utc),
+    )
+    db.add(demande)
+    db.commit()
+    db.refresh(demande)
+    return _to_demande_out(db, demande)
+
+
 @router.get("/demandes", response_model=list[DemandeOut])
 def mes_demandes(
     db: Session = Depends(get_db),
@@ -115,6 +201,8 @@ def mes_demandes(
     parent = db.query(Parent).filter(Parent.user_id == user.id).first()
     if not parent:
         return []
+    auto_sync_enfants_eligibles_du_parent(db=db, user=user)
+    db.commit()
     demandes = (
         db.query(DemandeInscription)
         .options(joinedload(DemandeInscription.desistement))

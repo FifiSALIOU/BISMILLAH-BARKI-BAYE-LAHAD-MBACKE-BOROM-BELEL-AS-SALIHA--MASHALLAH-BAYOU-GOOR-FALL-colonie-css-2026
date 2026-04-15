@@ -490,6 +490,7 @@ export default function ParentDashboard() {
   const filledSlots = allSlots.filter(s => s.enfant);
   const emptySlots = allSlots.filter(s => !s.enfant);
   const canInscrire = !inscriptionsCloturees && (MAX === null || enfants.length < MAX);
+  const noEnfantCharge = enfants.length === 0;
   const slotsToShow = enfants.length < (MAX ?? Infinity)
     ? [...filledSlots, ...(emptySlots.length > 0 ? [emptySlots[0]] : [])]
     : filledSlots;
@@ -505,7 +506,8 @@ export default function ParentDashboard() {
         </div>
         {canInscrire && (
           <Button onClick={() => setInscrireOpen(true)} className="rounded-lg bg-accent text-white hover:bg-accent/90 gap-2">
-            <UserPlus className="w-4 h-4" />Inscrire un enfant
+            <UserPlus className="w-4 h-4" />
+            {noEnfantCharge ? 'Inscrire un enfant (non biologique)' : 'Inscrire un enfant'}
           </Button>
         )}
       </motion.div>
@@ -724,6 +726,7 @@ export default function ParentDashboard() {
           <InscrireEnfant
             onClose={() => setInscrireOpen(false)}
             nbEnfantsInscrits={enfants.length}
+            nonBiologiqueMode={noEnfantCharge}
             onInscriptionSuccess={() => { void loadAll(); }}
           />
         </DialogContent>

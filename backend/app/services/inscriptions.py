@@ -42,6 +42,10 @@ def _validate_annee_naissance(d: date) -> None:
         )
 
 
+def _date_naissance_dans_plage(d: date) -> bool:
+    return 2012 <= int(d.year) <= 2019
+
+
 def _get_or_create_service(db: Session, nom: str) -> Service:
     svc = db.query(Service).filter(Service.nom == nom).first()
     if svc:
@@ -331,6 +335,71 @@ def create_inscription_for_parent_user(
     db.flush()
 
     return demande
+
+
+def auto_sync_enfants_eligibles_du_parent(*, db: Session, user: User) -> None:
+    """Crée les demandes manquantes pour les enfants existants du parent connecté (nés entre 2012 et 2019)."""
+    parent = db.query(Parent).filter(Parent.user_id == user.id).first()
+    if parent is None:
+        return
+
+    raise_if_liste_finale_definitive()
+    ensure_listes_exist(db)
+
+    enfants = (
+        db.query(Enfant)
+        .filter(Enfant.parent_id == parent.id)
+        .order_by(Enfant.created_at.asc().nulls_last(), Enfant.id.asc())
+        .all()
+    )
+    if not enfants:
+        return
+
+    enfants_eligibles = [e for e in enfants if _date_naissance_dans_plage(e.date_naissance)]
+    if not enfants_eligibles:
+        return
+
+    max_enfants = _get_max_enfants_par_parent(db)
+
+    existantes = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(Enfant.parent_id == parent.id)
+        .all()
+    )
+    demande_by_enfant_id = {int(d.enfant_id): d for d in existantes}
+    deja_avec_demande = len(demande_by_enfant_id)
+
+    for enfant in enfants_eligibles:
+        if int(enfant.id) in demande_by_enfant_id:
+            continue
+        if deja_avec_demande >= max_enfants:
+            break
+
+        inscription_index = deja_avec_demande + 1
+        target_code = _compute_target_liste_code(
+            lien_parente=enfant.lien_parente,
+            inscription_index=inscription_index,
+        )
+        target_liste = db.query(Liste).filter(Liste.code == target_code).first()
+        if target_liste is None:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste non configurée.")
+
+        enfant.is_titulaire = inscription_index == 1
+        rang = _next_rang_for_liste(db, int(target_liste.id))
+        demande = DemandeInscription(
+            enfant_id=enfant.id,
+            liste_id=target_liste.id,
+            rang_dans_liste=rang,
+            date_inscription=date.today(),
+            statut=DemandeStatut.SOUMISE,
+            non_validation_reason="",
+            user_id=user.id,
+        )
+        db.add(demande)
+        db.flush()
+        demande_by_enfant_id[int(enfant.id)] = demande
+        deja_avec_demande += 1
 
 
 def set_titulaire(*, db: Session, user: User, enfant_id_titulaire: int) -> None:

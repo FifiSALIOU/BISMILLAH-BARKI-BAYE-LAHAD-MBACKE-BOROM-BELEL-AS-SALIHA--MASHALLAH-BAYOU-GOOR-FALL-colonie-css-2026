@@ -25,8 +25,9 @@ export function parseApiError(payload: unknown): string {
 }
 
 export async function apiRequest<T = any>(path: string, options: ApiRequestOptions = {}): Promise<T> {
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const headers: Record<string, string> = {
-    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
+    ...((options.body && !isFormData) ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers || {}),
   };
   if (options.token) headers.Authorization = `Bearer ${options.token}`;

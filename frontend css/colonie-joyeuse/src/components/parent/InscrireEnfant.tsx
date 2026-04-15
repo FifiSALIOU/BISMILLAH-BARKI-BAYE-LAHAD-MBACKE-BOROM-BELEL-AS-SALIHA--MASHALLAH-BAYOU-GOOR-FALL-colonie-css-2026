@@ -24,9 +24,10 @@ interface InscrireEnfantProps {
   /** Nombre d’enfants déjà inscrits (API) — sinon repli sur le contexte local */
   nbEnfantsInscrits?: number;
   onInscriptionSuccess?: () => void;
+  nonBiologiqueMode?: boolean;
 }
 
-export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscriptionSuccess }: InscrireEnfantProps = {}) {
+export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscriptionSuccess, nonBiologiqueMode = false }: InscrireEnfantProps = {}) {
   const { parent, token, refreshParentProfile } = useAuth();
   const { getEnfantsByParent, settings, addHistorique } = useInscription();
 
@@ -46,6 +47,7 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
   const [showNextPrompt, setShowNextPrompt] = useState(false);
   const [showMaxReachedPopup, setShowMaxReachedPopup] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [justificatifFile, setJustificatifFile] = useState<File | null>(null);
 
   if (!parent) return null;
 
@@ -80,9 +82,15 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
       setErrorOpen(true);
       return;
     }
-    if (!prenom.trim() || !nom.trim() || !dateNaissance || !sexe || !lienParente || !telephone.trim()) {
+    if (!prenom.trim() || !nom.trim() || !dateNaissance || !sexe || (!nonBiologiqueMode && !lienParente) || !telephone.trim()) {
       setErrorTitle("Champs requis");
       setErrorMessage("Veuillez remplir tous les champs obligatoires du formulaire.");
+      setErrorOpen(true);
+      return;
+    }
+    if (nonBiologiqueMode && !justificatifFile) {
+      setErrorTitle("Document requis");
+      setErrorMessage("Veuillez joindre un document justificatif (extrait de naissance ou certificat de scolarité).");
       setErrorOpen(true);
       return;
     }
@@ -102,7 +110,9 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
     let liste: 'principale' | 'attente_n1' | 'attente_n2';
     let statut: 'Titulaire' | 'Suppléant N1' | 'Suppléant N2';
 
-    if (nbInscrits === 0) {
+    if (nonBiologiqueMode) {
+      liste = 'attente_n2'; statut = 'Suppléant N2';
+    } else if (nbInscrits === 0) {
       liste = 'principale'; statut = 'Titulaire';
     } else if (nbInscrits === 1) {
       if (lienParente === 'AUTRE') {
@@ -116,28 +126,44 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
 
     try {
       if (!token) throw new Error('Session expirée');
-      await apiRequest('/parent/inscriptions', {
-        method: 'POST',
-        token,
-        body: JSON.stringify({
-          parent: {
-            prenom: parent.prenom,
-            nom: parent.nom,
-            matricule: parent.matricule,
-            service: parent.service,
-            email: email.trim() || null,
-            telephone: telephone.trim(),
-            site_code: parent.site_code || parent.site || null,
-          },
-          enfant: {
-            prenom: prenom.trim(),
-            nom: nom.trim(),
-            date_naissance: dateNaissance,
-            sexe: sexe as 'M' | 'F',
-            lien_parente: lienParente,
-          },
-        }),
-      });
+      if (nonBiologiqueMode) {
+        const formData = new FormData();
+        formData.append('enfant_prenom', prenom.trim());
+        formData.append('enfant_nom', nom.trim());
+        formData.append('enfant_date_naissance', dateNaissance);
+        formData.append('enfant_sexe', sexe as 'M' | 'F');
+        if (justificatifFile) {
+          formData.append('justificatif', justificatifFile);
+        }
+        await apiRequest('/parent/inscriptions-n2', {
+          method: 'POST',
+          token,
+          body: formData,
+        });
+      } else {
+        await apiRequest('/parent/inscriptions', {
+          method: 'POST',
+          token,
+          body: JSON.stringify({
+            parent: {
+              prenom: parent.prenom,
+              nom: parent.nom,
+              matricule: parent.matricule,
+              service: parent.service,
+              email: email.trim() || null,
+              telephone: telephone.trim(),
+              site_code: parent.site_code || parent.site || null,
+            },
+            enfant: {
+              prenom: prenom.trim(),
+              nom: nom.trim(),
+              date_naissance: dateNaissance,
+              sexe: sexe as 'M' | 'F',
+              lien_parente: lienParente,
+            },
+          }),
+        });
+      }
       await refreshParentProfile();
       onInscriptionSuccess?.();
       addHistorique({
@@ -300,6 +326,18 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
                   <p className="text-xs text-accent mt-1">⚠ Cet enfant sera placé en Liste d'Attente N°2.</p>
                 ) : null}
               </div>
+              {nonBiologiqueMode && (
+                <div className="space-y-2 sm:col-span-2">
+                  <Label className="text-foreground">Document justificatif *</Label>
+                  <Input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => setJustificatifFile(e.target.files?.[0] ?? null)}
+                    className="h-11 rounded-lg"
+                  />
+                  <p className="text-xs text-muted-foreground">Extrait de naissance ou certificat de scolarité.</p>
+                </div>
+              )}
             </div>
           </div>
 
