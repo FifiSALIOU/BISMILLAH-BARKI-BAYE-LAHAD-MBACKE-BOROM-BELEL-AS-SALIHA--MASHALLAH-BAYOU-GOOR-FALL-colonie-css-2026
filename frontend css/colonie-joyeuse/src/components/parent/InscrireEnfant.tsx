@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInscription } from '@/contexts/InscriptionContext';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { AlertTriangle, CheckCircle2, UserPlus, Star, Clock, PartyPopper, X } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, UserPlus, Star, Clock, PartyPopper, X, Upload } from 'lucide-react';
 import { apiRequest } from '@/lib/api';
 
 /** Valeurs attendues par l'API (`LienParente`) — libellés FR pour l'affichage */
@@ -52,6 +52,7 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewName, setPreviewName] = useState('');
   const [previewMime, setPreviewMime] = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   if (!parent) return null;
 
@@ -363,15 +364,34 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
               )}
               {nonBiologiqueMode && (
                 <div className="space-y-2 sm:col-span-2">
-                  <Label className="text-foreground">Document justificatif (Extrait de naissance ou Certificat de scolarité)</Label>
-                  <p className="text-xs text-muted-foreground">Téléverser / Uploader un ou plusieurs fichiers (exemple : recto et verso).</p>
-                  <Input
+                  <Label className="text-foreground">Document justificatif (Extrait de naissance ou Certificat de scolarité) *</Label>
+                  {/* <p className="text-xs text-muted-foreground">Téléverser / Uploader un ou plusieurs fichiers (exemple : recto et verso).</p> */}
+                  <input
+                    ref={fileInputRef}
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
                     multiple
+                    required
+                    aria-required="true"
                     onChange={(e) => setJustificatifFiles(Array.from(e.target.files ?? []))}
-                    className="h-11 rounded-lg"
+                    className="hidden"
                   />
+                  <div className="flex items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="rounded-lg h-10 px-4 gap-2"
+                    >
+                      <Upload className="w-4 h-4" />
+                      Choisir des fichiers
+                    </Button>
+                    <span className="text-xs text-muted-foreground">
+                      {justificatifFiles.length === 0
+                        ? 'Aucun fichier sélectionné'
+                        : `${justificatifFiles.length} fichier(s) sélectionné(s)`}
+                    </span>
+                  </div>
                   {justificatifFiles.length > 0 && (
                     <div className="space-y-1">
                       {justificatifFiles.map((file, idx) => (
