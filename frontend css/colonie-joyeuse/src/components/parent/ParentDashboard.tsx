@@ -613,14 +613,16 @@ export default function ParentDashboard() {
                   <div className="flex gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
                     {!inscriptionsCloturees && enfant.lienParente !== 'Autre' && !enfant.desistement && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && enfant.statut !== 'Titulaire' && (
                       <>
-                        <Button
-                          variant="default"
-                          size="sm"
-                          onClick={() => handleSetTitulaire(enfant.id, `${enfant.prenom} ${enfant.nom}`)}
-                          className="rounded-lg gap-1 text-xs !bg-[#f5a623] !border-[#f5a623] !text-white hover:!bg-[#e39a1f]"
-                        >
-                          Titulaire
-                        </Button>
+                        {!hasTitulaire && (
+                          <Button
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleSetTitulaire(enfant.id, `${enfant.prenom} ${enfant.nom}`)}
+                            className="rounded-lg gap-1 text-xs !bg-[#f5a623] !border-[#f5a623] !text-white hover:!bg-[#e39a1f]"
+                          >
+                            Titulaire
+                          </Button>
+                        )}
                         <Button
                           variant="outline"
                           size="sm"
