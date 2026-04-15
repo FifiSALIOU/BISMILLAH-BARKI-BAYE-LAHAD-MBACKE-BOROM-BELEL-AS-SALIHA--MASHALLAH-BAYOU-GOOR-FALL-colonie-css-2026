@@ -135,7 +135,7 @@ class DemandeInscription(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     date_inscription: Mapped[date] = mapped_column(Date, nullable=False)
-    rang_dans_liste: Mapped[int] = mapped_column(Integer, nullable=False)
+    rang_dans_liste: Mapped[int | None] = mapped_column(Integer, nullable=True)
     statut: Mapped[DemandeStatut] = mapped_column(
         IntEnumType(DemandeStatut, DEMANDE_STATUT_TO_INT),
         nullable=False,
@@ -152,7 +152,7 @@ class DemandeInscription(Base):
         BigInteger, ForeignKey("users.id"), nullable=True
     )
     justificatif_valide_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    liste_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("listes.id"), nullable=False)
+    liste_id: Mapped[int | None] = mapped_column(BigInteger, ForeignKey("listes.id"), nullable=True)
     enfant_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("enfants.id"), nullable=False)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id"), nullable=False)
 
@@ -160,7 +160,7 @@ class DemandeInscription(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     enfant: Mapped["Enfant"] = relationship(back_populates="demande_inscription")
-    liste: Mapped["Liste"] = relationship(back_populates="demandes")
+    liste: Mapped[Optional["Liste"]] = relationship(back_populates="demandes")
     desistement: Mapped[Optional["Desistement"]] = relationship(
         back_populates="demande_inscription",
         uselist=False,

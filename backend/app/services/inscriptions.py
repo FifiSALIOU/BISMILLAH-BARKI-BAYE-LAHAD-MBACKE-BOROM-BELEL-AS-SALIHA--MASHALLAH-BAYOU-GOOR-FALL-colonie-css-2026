@@ -376,23 +376,12 @@ def auto_sync_enfants_eligibles_du_parent(*, db: Session, user: User) -> None:
         if deja_avec_demande >= max_enfants:
             break
 
-        # Au chargement automatique, le parent doit d'abord choisir le titulaire.
-        # On n'impose donc pas de titulaire initial.
-        target_code = (
-            ListeCode.ATTENTE_N2
-            if enfant.lien_parente == LienParente.AUTRE
-            else ListeCode.ATTENTE_N1
-        )
-        target_liste = db.query(Liste).filter(Liste.code == target_code).first()
-        if target_liste is None:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste non configurée.")
-
+        # Aucun rang/liste en base tant que le parent n'a pas fait ses choix.
         enfant.is_titulaire = False
-        rang = _next_rang_for_liste(db, int(target_liste.id))
         demande = DemandeInscription(
             enfant_id=enfant.id,
-            liste_id=target_liste.id,
-            rang_dans_liste=rang,
+            liste_id=None,
+            rang_dans_liste=None,
             date_inscription=date.today(),
             statut=DemandeStatut.SOUMISE,
             non_validation_reason="",
@@ -456,10 +445,11 @@ def set_titulaire(*, db: Session, user: User, enfant_id_titulaire: int) -> None:
         liste_principale = db.query(Liste).filter(Liste.code == ListeCode.PRINCIPALE).first()
         if liste_principale is None:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste principale introuvable.")
-        old_liste_id = int(dem.liste_id)
+        old_liste_id = int(dem.liste_id) if dem.liste_id is not None else None
         dem.liste_id = int(liste_principale.id)
         dem.rang_dans_liste = _next_rang_for_liste(db, int(liste_principale.id))
-        _next_rang_for_liste(db, old_liste_id)
+        if old_liste_id is not None:
+            _next_rang_for_liste(db, old_liste_id)
         return
 
     if len(enfants) == 1 or ancien_titulaire.id == enfant_titulaire.id:
@@ -480,6 +470,13 @@ def set_titulaire(*, db: Session, user: User, enfant_id_titulaire: int) -> None:
     for d in (ancienne_demande, nouvelle_demande):
         _require_not_rejet_definitif(d)
 
+    if (
+        ancienne_demande.liste_id is None
+        or ancienne_demande.rang_dans_liste is None
+        or nouvelle_demande.liste_id is None
+        or nouvelle_demande.rang_dans_liste is None
+    ):
+        return
     ancienne_liste_id = int(ancienne_demande.liste_id)
     ancien_rang = int(ancienne_demande.rang_dans_liste)
     nouvelle_liste_id = int(nouvelle_demande.liste_id)
@@ -495,6 +492,39 @@ def set_titulaire(*, db: Session, user: User, enfant_id_titulaire: int) -> None:
     nouvelle_demande.rang_dans_liste = ancien_rang
     ancienne_demande.liste_id = nouvelle_liste_id
     ancienne_demande.rang_dans_liste = nouveau_rang
+
+
+def set_suppleant_n1(*, db: Session, user: User, enfant_id_suppleant: int) -> None:
+    raise_if_liste_finale_definitive()
+    parent = db.query(Parent).filter(Parent.user_id == user.id).first()
+    if not parent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent introuvable.")
+
+    demande = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(DemandeInscription.id == enfant_id_suppleant, Enfant.parent_id == parent.id)
+        .first()
+    )
+    if not demande:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande introuvable.")
+    _require_not_rejet_definitif(demande)
+
+    enfant = demande.enfant
+    if enfant.lien_parente == LienParente.AUTRE:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Un enfant 'Autre' ne peut pas être en N1.")
+
+    ensure_listes_exist(db)
+    liste_n1 = db.query(Liste).filter(Liste.code == ListeCode.ATTENTE_N1).first()
+    if liste_n1 is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste N1 introuvable.")
+
+    old_liste_id = int(demande.liste_id) if demande.liste_id is not None else None
+    demande.liste_id = int(liste_n1.id)
+    demande.rang_dans_liste = _next_rang_for_liste(db, int(liste_n1.id))
+    enfant.is_titulaire = False
+    if old_liste_id is not None and old_liste_id != int(liste_n1.id):
+        _next_rang_for_liste(db, old_liste_id)
 
 
 def request_desistement(*, db: Session, user: User, demande_id: int, reason: str | None) -> None:

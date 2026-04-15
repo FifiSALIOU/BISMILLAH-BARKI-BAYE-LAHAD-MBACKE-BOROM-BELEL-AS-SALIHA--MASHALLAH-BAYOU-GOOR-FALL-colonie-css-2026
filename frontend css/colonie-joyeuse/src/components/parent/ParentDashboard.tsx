@@ -172,6 +172,7 @@ export default function ParentDashboard() {
 
   const enfantN1 = enfants.find(e => e.statut === 'Suppléant N1' && !e.desistement);
   const hasTitulaire = enfants.some((e) => e.statut === 'Titulaire');
+  const hasSuppleantN1 = enfants.some((e) => e.statut === 'Suppléant N1');
 
   // Action handlers (same as MesEnfants - unchanged behavior)
   const handleSetTitulaire = (id: string, name: string) => { setSelectedId(id); setSelectedName(name); setConfirmOpen(true); };
@@ -276,21 +277,12 @@ export default function ParentDashboard() {
   const setAsSuppleantN1 = async (id: string) => {
     const current = enfants.find((e) => e.id === id);
     if (!current || !token) return;
-    if (current.statut !== 'Titulaire') return;
-    const autre = enfants.find((e) => e.id !== id && e.lienParente !== 'Autre' && !e.rejetDefinitif && !e.desistement);
-    if (!autre?.demandeId) {
-      toast({
-        title: 'Action impossible',
-        description: "Choisissez d'abord un autre enfant comme titulaire.",
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!current.demandeId) return;
     try {
-      await apiRequest('/parent/titulaire', {
+      await apiRequest('/parent/suppleant-n1', {
         method: 'POST',
         token,
-        body: JSON.stringify({ enfant_id_titulaire: autre.demandeId }),
+        body: JSON.stringify({ enfant_id_titulaire: current.demandeId }),
       });
       await loadAll();
     } catch (err) {
@@ -610,19 +602,21 @@ export default function ParentDashboard() {
                     </span>
                   </div>
                   */}
-                  {/* Rang et liste : rang masqué à l’affichage seulement si désistement (jusqu’à réinscription : désistement effacé). */}
-                  <div className="flex items-center gap-1.5">
-                    <Hash className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-xs font-medium text-muted-foreground">
-                      {enfant.desistement ? (
-                        getListeLabel(enfant.liste)
-                      ) : (
-                        <>
-                          Rang <strong className="text-foreground">{getRangDansListeLocal(enfant.id)}</strong> — {getListeLabel(enfant.liste)}
-                        </>
-                      )}
-                    </span>
-                  </div>
+                  {/* Afficher Rang/Liste seulement après choix parent (Titulaire + Suppléant N1). */}
+                  {hasTitulaire && hasSuppleantN1 && (
+                    <div className="flex items-center gap-1.5">
+                      <Hash className="w-3 h-3 text-muted-foreground" />
+                      <span className="text-xs font-medium text-muted-foreground">
+                        {enfant.desistement ? (
+                          getListeLabel(enfant.liste)
+                        ) : (
+                          <>
+                            Rang <strong className="text-foreground">{getRangDansListeLocal(enfant.id)}</strong> — {getListeLabel(enfant.liste)}
+                          </>
+                        )}
+                      </span>
+                    </div>
+                  )}
 
                   {/* Statut badge */}
                   <div className="flex flex-wrap gap-1.5">
@@ -688,7 +682,7 @@ export default function ParentDashboard() {
                         </Button>
                       </>
                     )}
-                    {!enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
+                    {hasTitulaire && hasSuppleantN1 && !enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <Button variant="outline" size="sm" onClick={() => handleDesistement(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
                         <HandMetal className="w-3 h-3" />Désistement
                       </Button>
@@ -705,7 +699,9 @@ export default function ParentDashboard() {
                     )}
                   </div>
 
-                  <p className="text-[10px] text-muted-foreground/60 mt-1">Cliquez sur la carte pour voir sa position dans la liste</p>
+                  {hasTitulaire && hasSuppleantN1 && (
+                    <p className="text-[10px] text-muted-foreground/60 mt-1">Cliquez sur la carte pour voir sa position dans la liste</p>
+                  )}
               </div>
             </motion.div>
           ))}

@@ -30,6 +30,7 @@ from app.services.inscriptions import (
     parent_corriger_demande_sans_changer_rang,
     reinscrire_desiste,
     request_desistement,
+    set_suppleant_n1,
     set_titulaire,
 )
 from app.services.users import TELEPHONE_DEJA_UTILISE_DETAIL
@@ -296,6 +297,7 @@ def list_inscriptions_transparence(
             joinedload(DemandeInscription.enfant).joinedload(Enfant.parent),
             joinedload(DemandeInscription.liste),
         )
+        .filter(DemandeInscription.liste_id.isnot(None))
         .all()
     )
 
@@ -379,6 +381,17 @@ def definir_titulaire(
                 subject=subject_titulaire(parent.matricule),
                 body=body_titulaire(parent_matricule=parent.matricule, new_titulaire=new, old_titulaire=old),
             )
+    return {"ok": True}
+
+
+@router.post("/suppleant-n1")
+def definir_suppleant_n1(
+    payload: TitulaireUpdateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.PARENT)),
+):
+    set_suppleant_n1(db=db, user=user, enfant_id_suppleant=payload.enfant_id_titulaire)
+    db.commit()
     return {"ok": True}
 
 
@@ -522,7 +535,7 @@ def _to_demande_out(db: Session, demande: DemandeInscription) -> DemandeOut:
         when = datetime.combine(d_ins, datetime.min.time(), tzinfo=timezone.utc)
     return DemandeOut(
         id=demande.id,
-        liste_code=liste.code.value,
+        liste_code=(liste.code.value if liste is not None else "NON_INSCRIT"),
         rang_dans_liste=demande.rang_dans_liste,
         date_inscription=when,
         updated_at=_dt_aware_utc(demande.updated_at),

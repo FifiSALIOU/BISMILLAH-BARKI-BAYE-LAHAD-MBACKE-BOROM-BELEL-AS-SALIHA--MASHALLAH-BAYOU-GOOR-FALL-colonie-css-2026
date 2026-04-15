@@ -68,7 +68,7 @@ class TransparenceInscriptionOut(BaseModel):
 class DemandeOut(BaseModel):
     id: int
     liste_code: str
-    rang_dans_liste: int
+    rang_dans_liste: Optional[int] = None
     date_inscription: datetime
     updated_at: Optional[datetime] = None
     statut: str
