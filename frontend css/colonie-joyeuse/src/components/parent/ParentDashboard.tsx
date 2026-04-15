@@ -603,10 +603,10 @@ export default function ParentDashboard() {
                     {!inscriptionsCloturees && enfant.lienParente !== 'Autre' && !enfant.desistement && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <>
                         <Button
-                          variant={enfant.statut === 'Titulaire' ? 'default' : 'outline'}
+                          variant="default"
                           size="sm"
                           onClick={() => handleSetTitulaire(enfant.id, `${enfant.prenom} ${enfant.nom}`)}
-                          className="rounded-lg gap-1 text-xs"
+                          className="rounded-lg gap-1 text-xs !bg-[#f5a623] !border-[#f5a623] !text-white hover:!bg-[#e39a1f]"
                         >
                           Titulaire
                         </Button>
