@@ -445,12 +445,13 @@ export default function GestionListe({ type }: Props) {
                             </Button>
                           )}
                           */}
-                          {/* Refuser for en_attente only */}
+                          {/* Action "Refuser" masquée à la demande.
                           {validation === 'en_attente' && !e.desistement && (
                             <Button size="sm" onClick={() => { setRefusTarget(e); setRefusOpen(true); }} className="gap-1 text-xs rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground h-7 px-2">
                               <ThumbsDown className="w-3 h-3" />Refuser
                             </Button>
                           )}
+                          */}
                           {e.desistement === 'demandé' && (
                             <Button size="sm" onClick={() => { setDesistTarget(e); setConfirmDesistOpen(true); }} className="gap-1 text-xs rounded-lg bg-accent hover:bg-accent/90 text-white h-7 px-2">
                               <CheckCircle2 className="w-3 h-3" />Valider désist.
@@ -469,9 +470,11 @@ export default function GestionListe({ type }: Props) {
                               <Button size="sm" onClick={() => handleValiderJustificatif(e)} className="gap-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2">
                                 <CheckCircle2 className="w-3 h-3" />Valider doc
                               </Button>
+                              {/* Action "Refuser doc" masquée à la demande.
                               <Button size="sm" onClick={() => handleRefuserJustificatif(e)} className="gap-1 text-xs rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground h-7 px-2">
                                 <ThumbsDown className="w-3 h-3" />Refuser doc
                               </Button>
+                              */}
                             </>
                           )}
                         </div>
