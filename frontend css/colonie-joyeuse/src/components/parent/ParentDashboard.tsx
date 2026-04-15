@@ -639,7 +639,7 @@ export default function ParentDashboard() {
                         )}
                       </>
                     )}
-                    {hasTitulaire && hasSuppleantN1 && (enfant.statut === 'Titulaire' || enfant.statut === 'Suppléant N1') && !enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
+                    {(enfant.statut === 'Titulaire' || (hasTitulaire && hasSuppleantN1 && enfant.statut === 'Suppléant N1')) && !enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <Button variant="outline" size="sm" onClick={() => handleDesistement(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
                         <HandMetal className="w-3 h-3" />Désistement
                       </Button>
@@ -671,7 +671,7 @@ export default function ParentDashboard() {
                   </div>
                   */}
                   {/* Afficher Rang/Liste seulement après choix parent (Titulaire + Suppléant N1). */}
-                  {hasTitulaire && hasSuppleantN1 && (
+                  {(enfant.statut === 'Titulaire' || (hasTitulaire && hasSuppleantN1)) && (
                     <div className="flex items-center gap-1.5">
                       <Hash className="w-3 h-3 text-muted-foreground" />
                       <span className="text-xs font-medium text-muted-foreground">
@@ -715,7 +715,7 @@ export default function ParentDashboard() {
                     </span>
                   )}
 
-                  {hasTitulaire && hasSuppleantN1 && (
+                  {(enfant.statut === 'Titulaire' || (hasTitulaire && hasSuppleantN1)) && (
                     <p className="text-[10px] text-muted-foreground/60 mt-1">Cliquez sur la carte pour voir sa position dans la liste</p>
                   )}
               </div>
