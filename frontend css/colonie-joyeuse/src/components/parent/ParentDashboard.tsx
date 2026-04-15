@@ -590,6 +590,28 @@ export default function ParentDashboard() {
       {/* Vos inscriptions - Cards with actions */}
       <div className="space-y-4">
         <h2 className="text-lg font-semibold text-foreground">Mes enfants</h2>
+        {noEnfantCharge && (
+          <div className="max-w-4xl space-y-4">
+            <div className="rounded-xl border border-amber-300/90 bg-amber-50/40 p-5">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-full border border-amber-300/80 bg-amber-50 shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-base font-semibold text-foreground">Cet agent n&apos;a pas d&apos;enfant codifié</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Vous pouvez inscrire un enfant en fournissant les documents justificatifs.</p>
+                </div>
+              </div>
+            </div>
+            {canInscrire && (
+              <Button onClick={() => setInscrireOpen(true)} variant="outline" className="rounded-lg h-10 px-4 gap-2 text-sm">
+                <UserPlus className="w-4 h-4" />
+                Inscrire un enfant (non biologique)
+              </Button>
+            )}
+          </div>
+        )}
+        {!noEnfantCharge && (
         <div className="grid gap-4 w-full max-w-4xl">
           {enfants.map((enfant, i) => (
             <motion.div
@@ -722,6 +744,7 @@ export default function ParentDashboard() {
             </motion.div>
           ))}
         </div>
+        )}
       </div>
 
       {/* Tabs: Listes + Liste finale */}
