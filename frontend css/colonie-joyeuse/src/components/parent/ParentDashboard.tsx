@@ -171,6 +171,7 @@ export default function ParentDashboard() {
     : [];
 
   const enfantN1 = enfants.find(e => e.statut === 'Suppléant N1' && !e.desistement);
+  const hasTitulaire = enfants.some((e) => e.statut === 'Titulaire');
 
   // Action handlers (same as MesEnfants - unchanged behavior)
   const handleSetTitulaire = (id: string, name: string) => { setSelectedId(id); setSelectedName(name); setConfirmOpen(true); };
@@ -270,6 +271,32 @@ export default function ParentDashboard() {
       console.error(err);
     }
     setReinscrireOpen(false);
+  };
+
+  const setAsSuppleantN1 = async (id: string) => {
+    const current = enfants.find((e) => e.id === id);
+    if (!current || !token) return;
+    if (current.statut !== 'Titulaire') return;
+    const autre = enfants.find((e) => e.id !== id && e.lienParente !== 'Autre' && !e.rejetDefinitif && !e.desistement);
+    if (!autre?.demandeId) {
+      toast({
+        title: 'Action impossible',
+        description: "Choisissez d'abord un autre enfant comme titulaire.",
+        variant: 'destructive',
+      });
+      return;
+    }
+    try {
+      await apiRequest('/parent/titulaire', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ enfant_id_titulaire: autre.demandeId }),
+      });
+      await loadAll();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Action impossible';
+      toast({ title: 'Action impossible', description: msg, variant: 'destructive' });
+    }
   };
 
   const handleEditDemande = (enfant: Enfant) => {
@@ -481,19 +508,8 @@ export default function ParentDashboard() {
     );
   };
 
-  const allSlots = [
-    { label: 'Titulaire — Liste Principale', enfant: titulaire, color: 'bg-emerald-500', bgColor: 'bg-emerald-50', textColor: 'text-emerald-700', icon: Star },
-    { label: 'Suppléant — Liste N1', enfant: suppN1, color: 'bg-accent', bgColor: 'bg-accent/10', textColor: 'text-accent', icon: Clock },
-    { label: 'Suppléant — Liste N2', enfant: suppN2, color: 'bg-orange-500', bgColor: 'bg-orange-50', textColor: 'text-orange-700', icon: Clock },
-  ];
-
-  const filledSlots = allSlots.filter(s => s.enfant);
-  const emptySlots = allSlots.filter(s => !s.enfant);
   const canInscrire = !inscriptionsCloturees && (MAX === null || enfants.length < MAX);
   const noEnfantCharge = enfants.length === 0;
-  const slotsToShow = enfants.length < (MAX ?? Infinity)
-    ? [...filledSlots, ...(emptySlots.length > 0 ? [emptySlots[0]] : [])]
-    : filledSlots;
 
   return (
     <div className="max-w-5xl mx-auto space-y-8">
@@ -568,23 +584,22 @@ export default function ParentDashboard() {
       <div className="space-y-4">
         <h2 className="text-lg font-semibold text-foreground">Vos inscriptions</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {slotsToShow.map((slot, i) => (
+          {enfants.map((enfant, i) => (
             <motion.div
-              key={slot.label}
+              key={enfant.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 + 0.1 * i }}
-              className={`rounded-xl border border-border p-5 ${slot.enfant ? 'bg-card cursor-pointer hover:shadow-md transition-shadow' : 'bg-muted/30 border-dashed'} shadow-card`}
-              onClick={() => slot.enfant && handleCardClick(slot.enfant)}
+              className="rounded-xl border border-border p-5 bg-card cursor-pointer hover:shadow-md transition-shadow shadow-card"
+              onClick={() => handleCardClick(enfant)}
             >
               <div className="flex items-center gap-2 mb-3">
-                <div className={`w-2 h-2 rounded-full ${slot.enfant ? slot.color : 'bg-muted-foreground/30'}`} />
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{slot.label}</span>
+                <div className="w-2 h-2 rounded-full bg-accent" />
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Enfant</span>
               </div>
-              {slot.enfant ? (
-                <div className="space-y-2">
-                  <p className="font-semibold text-foreground">{slot.enfant.prenom} {slot.enfant.nom}</p>
-                  <p className="text-sm text-muted-foreground">{calculateAge(slot.enfant.dateNaissance)} ans — {slot.enfant.sexe === 'M' ? 'Garçon' : 'Fille'} — {slot.enfant.lienParente}</p>
+              <div className="space-y-2">
+                <p className="font-semibold text-foreground">{enfant.prenom} {enfant.nom}</p>
+                <p className="text-sm text-muted-foreground">{calculateAge(enfant.dateNaissance)} ans — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'} — {enfant.lienParente}</p>
                   
                   {/*
                   Ancien affichage (le rang était toujours visible, y compris après désistement) :
@@ -599,11 +614,11 @@ export default function ParentDashboard() {
                   <div className="flex items-center gap-1.5">
                     <Hash className="w-3 h-3 text-muted-foreground" />
                     <span className="text-xs font-medium text-muted-foreground">
-                      {slot.enfant.desistement ? (
-                        getListeLabel(slot.enfant.liste)
+                      {enfant.desistement ? (
+                        getListeLabel(enfant.liste)
                       ) : (
                         <>
-                          Rang <strong className="text-foreground">{getRangDansListeLocal(slot.enfant.id)}</strong> — {getListeLabel(slot.enfant.liste)}
+                          Rang <strong className="text-foreground">{getRangDansListeLocal(enfant.id)}</strong> — {getListeLabel(enfant.liste)}
                         </>
                       )}
                     </span>
@@ -611,30 +626,34 @@ export default function ParentDashboard() {
 
                   {/* Statut badge */}
                   <div className="flex flex-wrap gap-1.5">
-                    <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${slot.bgColor} ${slot.textColor}`}>{slot.enfant.statut}</span>
-                    {slot.enfant.reinscrit && (
+                    <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${
+                      !hasTitulaire ? 'bg-muted text-muted-foreground' : getStatutBadge(enfant.statut)
+                    }`}>
+                      {!hasTitulaire ? 'Non inscrit' : enfant.statut}
+                    </span>
+                    {enfant.reinscrit && (
                       <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-accent/10 text-accent border border-accent/20">Réinscrit</span>
                     )}
                   </div>
 
                   {/* Validation badge (rien si soumise sans refus) */}
-                  {getValidationBadge(slot.enfant)}
-                  {slot.enfant.rejetDefinitif && (
+                  {getValidationBadge(enfant)}
+                  {enfant.rejetDefinitif && (
                     <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold bg-destructive/15 text-destructive border border-destructive/25">
                       Refus définitif — aucune action possible
                     </span>
                   )}
 
                   {/* Désistement badges */}
-                  {slot.enfant.desistement === 'demandé' && (
+                  {enfant.desistement === 'demandé' && (
                     <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium bg-amber-50 text-amber-700">⏳ Désistement en attente</span>
                   )}
-                  {slot.enfant.desistement === 'validé' && (
+                  {enfant.desistement === 'validé' && (
                     <span className="inline-block px-2 py-0.5 rounded-md text-xs font-medium bg-destructive/10 text-destructive">Désisté</span>
                   )}
 
                   {/* Retenu badge */}
-                  {isInFinale(slot.enfant.id) && !slot.enfant.desistement && (
+                  {isInFinale(enfant.id) && !enfant.desistement && (
                     <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center gap-1 w-fit">
                       <Award className="w-3 h-3" /> Retenu(e) pour la colonie
                     </span>
@@ -642,45 +661,52 @@ export default function ParentDashboard() {
 
                   {/* Action buttons */}
                   <div className="flex gap-2 mt-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                    {!inscriptionsCloturees && !slot.enfant.rejetDefinitif && !slot.enfant.desistement && !listeFinaleDefinitiveApi && (
-                      <Button variant="outline" size="sm" onClick={() => handleEditDemande(slot.enfant!)} className="rounded-lg gap-1 text-xs">
+                    {/* Bouton "Modifier" masqué à la demande, sans supprimer la logique associée.
+                    {!inscriptionsCloturees && !enfant.rejetDefinitif && !enfant.desistement && !listeFinaleDefinitiveApi && (
+                      <Button variant="outline" size="sm" onClick={() => handleEditDemande(enfant)} className="rounded-lg gap-1 text-xs">
                         <FilePenLine className="w-3 h-3" />Modifier
                       </Button>
                     )}
-                    {!inscriptionsCloturees && slot.enfant.statut !== 'Titulaire' && slot.enfant.lienParente !== 'Autre' && !slot.enfant.desistement && !slot.enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
-                      <Button variant="outline" size="sm" onClick={() => handleSetTitulaire(slot.enfant!.id, `${slot.enfant!.prenom} ${slot.enfant!.nom}`)} className="rounded-lg gap-1 text-xs">
-                        <ArrowUpDown className="w-3 h-3" />Définir titulaire
-                      </Button>
+                    */}
+                    {!inscriptionsCloturees && enfant.lienParente !== 'Autre' && !enfant.desistement && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
+                      <>
+                        <Button
+                          variant={enfant.statut === 'Titulaire' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => handleSetTitulaire(enfant.id, `${enfant.prenom} ${enfant.nom}`)}
+                          className="rounded-lg gap-1 text-xs"
+                        >
+                          Titulaire
+                        </Button>
+                        <Button
+                          variant={enfant.statut !== 'Titulaire' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => { void setAsSuppleantN1(enfant.id); }}
+                          className="rounded-lg gap-1 text-xs"
+                        >
+                          Suppléant N1
+                        </Button>
+                      </>
                     )}
-                    {!slot.enfant.desistement && slot.enfant.validation !== 'refusé' && !slot.enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
-                      <Button variant="outline" size="sm" onClick={() => handleDesistement(slot.enfant!.id, `${slot.enfant!.prenom} ${slot.enfant!.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
+                    {!enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
+                      <Button variant="outline" size="sm" onClick={() => handleDesistement(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
                         <HandMetal className="w-3 h-3" />Désistement
                       </Button>
                     )}
-                    {slot.enfant.desistement === 'demandé' && !slot.enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
-                      <Button variant="outline" size="sm" onClick={() => handleAnnulerDesistement(slot.enfant!.id)} className="rounded-lg gap-1 text-xs text-amber-700 border-amber-300 hover:bg-amber-50">
+                    {enfant.desistement === 'demandé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
+                      <Button variant="outline" size="sm" onClick={() => handleAnnulerDesistement(enfant.id)} className="rounded-lg gap-1 text-xs text-amber-700 border-amber-300 hover:bg-amber-50">
                         <XCircle className="w-3 h-3" />Annuler désistement
                       </Button>
                     )}
-                    {!inscriptionsCloturees && slot.enfant.desistement === 'validé' && !slot.enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
-                      <Button variant="outline" size="sm" onClick={() => handleReinscrire(slot.enfant!.id, `${slot.enfant!.prenom} ${slot.enfant!.nom}`)} className="rounded-lg gap-1 text-xs hover:bg-accent hover:text-white hover:border-accent">
+                    {!inscriptionsCloturees && enfant.desistement === 'validé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
+                      <Button variant="outline" size="sm" onClick={() => handleReinscrire(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs hover:bg-accent hover:text-white hover:border-accent">
                         <RotateCcw className="w-3 h-3" />Réinscrire
                       </Button>
                     )}
                   </div>
 
                   <p className="text-[10px] text-muted-foreground/60 mt-1">Cliquez sur la carte pour voir sa position dans la liste</p>
-                </div>
-              ) : (
-                <div className="text-center py-4">
-                  <p className="text-sm text-muted-foreground">Place disponible</p>
-                  {canInscrire && (
-                    <Button variant="outline" size="sm" onClick={() => setInscrireOpen(true)} className="mt-2 rounded-lg gap-1 text-xs">
-                      <UserPlus className="w-3 h-3" />Inscrire un enfant
-                    </Button>
-                  )}
-                </div>
-              )}
+              </div>
             </motion.div>
           ))}
         </div>

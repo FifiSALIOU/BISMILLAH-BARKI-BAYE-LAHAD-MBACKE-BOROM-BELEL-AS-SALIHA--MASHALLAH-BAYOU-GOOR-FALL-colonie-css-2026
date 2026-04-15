@@ -376,16 +376,18 @@ def auto_sync_enfants_eligibles_du_parent(*, db: Session, user: User) -> None:
         if deja_avec_demande >= max_enfants:
             break
 
-        inscription_index = deja_avec_demande + 1
-        target_code = _compute_target_liste_code(
-            lien_parente=enfant.lien_parente,
-            inscription_index=inscription_index,
+        # Au chargement automatique, le parent doit d'abord choisir le titulaire.
+        # On n'impose donc pas de titulaire initial.
+        target_code = (
+            ListeCode.ATTENTE_N2
+            if enfant.lien_parente == LienParente.AUTRE
+            else ListeCode.ATTENTE_N1
         )
         target_liste = db.query(Liste).filter(Liste.code == target_code).first()
         if target_liste is None:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste non configurée.")
 
-        enfant.is_titulaire = inscription_index == 1
+        enfant.is_titulaire = False
         rang = _next_rang_for_liste(db, int(target_liste.id))
         demande = DemandeInscription(
             enfant_id=enfant.id,
@@ -441,7 +443,26 @@ def set_titulaire(*, db: Session, user: User, enfant_id_titulaire: int) -> None:
     for e in enfants:
         e.is_titulaire = e.id == enfant_titulaire.id
 
-    if len(enfants) == 1 or ancien_titulaire is None or ancien_titulaire.id == enfant_titulaire.id:
+    if ancien_titulaire is None:
+        # Premier choix du parent: promotion vers la liste principale.
+        dem = (
+            db.query(DemandeInscription)
+            .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+            .filter(Enfant.id == enfant_titulaire.id, Enfant.parent_id == parent.id)
+            .first()
+        )
+        if dem is None:
+            return
+        liste_principale = db.query(Liste).filter(Liste.code == ListeCode.PRINCIPALE).first()
+        if liste_principale is None:
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste principale introuvable.")
+        old_liste_id = int(dem.liste_id)
+        dem.liste_id = int(liste_principale.id)
+        dem.rang_dans_liste = _next_rang_for_liste(db, int(liste_principale.id))
+        _next_rang_for_liste(db, old_liste_id)
+        return
+
+    if len(enfants) == 1 or ancien_titulaire.id == enfant_titulaire.id:
         return
 
     demandes = (
