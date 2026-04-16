@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useInscription } from '@/contexts/InscriptionContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileDown, Eye, Search, Filter, CheckCircle2, HandMetal, ThumbsDown } from 'lucide-react';
+import { FileDown, Eye, Search, Filter, CheckCircle2, HandMetal, ThumbsDown, X } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -78,6 +78,10 @@ export default function GestionListe({ type }: Props) {
   const [refusOpen, setRefusOpen] = useState(false);
   const [refusTarget, setRefusTarget] = useState<Enfant | null>(null);
   const [motifRefus, setMotifRefus] = useState('');
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewMime, setPreviewMime] = useState('');
+  const [previewName, setPreviewName] = useState('');
   const [refreshTick, setRefreshTick] = useState(0);
 
   const titles: Record<string, string> = {
@@ -265,12 +269,25 @@ export default function GestionListe({ type }: Props) {
         if (!res.ok) throw new Error('Impossible de télécharger le justificatif.');
         const blob = await res.blob();
         const url = URL.createObjectURL(blob);
-        window.open(url, '_blank');
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        setPreviewUrl(url);
+        setPreviewMime(blob.type || '');
+        setPreviewName(enfant.justificatifNomFichier || 'justificatif');
+        setPreviewOpen(true);
       })
       .catch((err) => {
         toast({ title: 'Erreur', description: err instanceof Error ? err.message : 'Erreur justificatif', variant: 'destructive' });
       });
   };
+
+  useEffect(() => {
+    if (!previewOpen && previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      setPreviewMime('');
+      setPreviewName('');
+    }
+  }, [previewOpen, previewUrl]);
 
   const handleValiderJustificatif = async (enfant: Enfant) => {
     if (!token) return;
@@ -331,22 +348,27 @@ export default function GestionListe({ type }: Props) {
     doc.save(`${type}.pdf`);
   };
 
+  const showFullDetail = type === 'attente_n2' && !!detailEnfant;
+
   return (
     <div className="max-w-7xl mx-auto space-y-6">
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <span className={`w-3 h-3 rounded-full ${dotColors[type]}`} />
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">{titles[type]}</h1>
-            <p className="text-muted-foreground mt-1"><strong>{enfants.length}</strong> enfant(s) — classés par rang dans la liste</p>
+      {!showFullDetail && (
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <span className={`w-3 h-3 rounded-full ${dotColors[type]}`} />
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">{titles[type]}</h1>
+              <p className="text-muted-foreground mt-1"><strong>{enfants.length}</strong> enfant(s) — classés par rang dans la liste</p>
+            </div>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={exportExcel} variant="outline" className="gap-2 rounded-lg"><FileDown className="w-4 h-4" />Export Excel</Button>
-          <Button onClick={exportPDF} variant="outline" className="gap-2 rounded-lg"><FileDown className="w-4 h-4" />Export PDF</Button>
-        </div>
-      </motion.div>
+          <div className="flex gap-2">
+            <Button onClick={exportExcel} variant="outline" className="gap-2 rounded-lg"><FileDown className="w-4 h-4" />Export Excel</Button>
+            <Button onClick={exportPDF} variant="outline" className="gap-2 rounded-lg"><FileDown className="w-4 h-4" />Export PDF</Button>
+          </div>
+        </motion.div>
+      )}
 
+      {!showFullDetail && (
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="flex flex-wrap gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -374,7 +396,9 @@ export default function GestionListe({ type }: Props) {
           </SelectContent>
         </Select>
       </motion.div>
+      )}
 
+      {!showFullDetail && (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card rounded-xl shadow-card border border-border">
         <div className="overflow-x-auto">
           <Table>
@@ -405,7 +429,13 @@ export default function GestionListe({ type }: Props) {
                   const p = { nom: e.parentNom, prenom: e.parentPrenom, service: e.parentService, email: e.parentEmail, telephone: e.parentTelephone };
                   const validation = e.validation || 'en_attente';
                   return (
-                    <TableRow key={e.id} className={e.desistement === 'validé' ? 'opacity-50' : ''}>
+                    <TableRow
+                      key={e.id}
+                      className={`${e.desistement === 'validé' ? 'opacity-50' : ''} ${type === 'attente_n2' ? 'cursor-pointer hover:bg-muted/30' : ''}`}
+                      onClick={() => {
+                        if (type === 'attente_n2') setDetailEnfant(e);
+                      }}
+                    >
                       <TableCell className="font-bold text-foreground text-center">{e.rang}</TableCell>
                       <TableCell className="font-mono tabular-nums text-sm">{e.parentMatricule}</TableCell>
                       <TableCell>{p?.nom || '—'}</TableCell>
@@ -436,7 +466,7 @@ export default function GestionListe({ type }: Props) {
                       </TableCell>
                       */}
                       <TableCell>
-                        <div className="flex gap-1 flex-wrap">
+                        <div className="flex flex-wrap items-center gap-2" onClick={(evt) => evt.stopPropagation()}>
                           {/*
                           Ancien bouton « Approuver » (voir handleValider commenté plus haut).
                           {validation === 'en_attente' && !e.desistement && (
@@ -457,20 +487,22 @@ export default function GestionListe({ type }: Props) {
                               <CheckCircle2 className="w-3 h-3" />Valider désist.
                             </Button>
                           )}
-                          <Button size="sm" variant="ghost" onClick={() => setDetailEnfant(e)} className="gap-1 text-xs rounded-lg h-7 px-2">
-                            <Eye className="w-3 h-3" />Détails
-                          </Button>
+                          {type !== 'attente_n2' && (
+                            <Button size="sm" variant="outline" onClick={() => setDetailEnfant(e)} className="gap-1 text-xs rounded-lg h-8 px-3">
+                              <Eye className="w-3 h-3" />Détails
+                            </Button>
+                          )}
                           {type === 'attente_n2' && !!e.justificatifNomFichier && (
-                            <Button size="sm" variant="ghost" onClick={() => handleVoirJustificatif(e)} className="gap-1 text-xs rounded-lg h-7 px-2">
+                            <Button size="sm" variant="outline" onClick={() => handleVoirJustificatif(e)} className="gap-1 text-xs rounded-lg h-8 px-3">
                               <Eye className="w-3 h-3" />Justificatif
                             </Button>
                           )}
                           {type === 'attente_n2' && !!e.justificatifNomFichier && e.justificatifValide == null && (
                             <>
-                              <Button size="sm" onClick={() => handleValiderJustificatif(e)} className="gap-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2">
+                              <Button size="sm" onClick={() => handleValiderJustificatif(e)} className="gap-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3">
                                 <CheckCircle2 className="w-3 h-3" />Valider
                               </Button>
-                              <Button size="sm" onClick={() => handleRefuserJustificatif(e)} className="gap-1 text-xs rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground h-7 px-2">
+                              <Button size="sm" onClick={() => handleRefuserJustificatif(e)} className="gap-1 text-xs rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground h-8 px-3">
                                 <ThumbsDown className="w-3 h-3" />Refus définitif
                               </Button>
                             </>
@@ -485,9 +517,74 @@ export default function GestionListe({ type }: Props) {
           </Table>
         </div>
       </motion.div>
+      )}
+
+      {showFullDetail && detailEnfant && (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-xl shadow-card border border-border p-6 space-y-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold text-foreground">Détails complets de la demande</h2>
+              <p className="text-sm text-muted-foreground mt-1">Parent : {detailEnfant.parentPrenom} {detailEnfant.parentNom} — Enfant : {detailEnfant.prenom} {detailEnfant.nom}</p>
+            </div>
+            <Button variant="outline" onClick={() => setDetailEnfant(null)} className="rounded-lg">
+              Fermer
+            </Button>
+          </div>
+          {(() => {
+            const p = { nom: detailEnfant.parentNom, prenom: detailEnfant.parentPrenom, service: detailEnfant.parentService, email: detailEnfant.parentEmail, telephone: detailEnfant.parentTelephone };
+            return (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  {detailEnfant.validation === 'validé' && <span className="text-xs font-semibold px-3 py-1 rounded-full bg-emerald-50 text-emerald-700">✅ Approuvé</span>}
+                  {detailEnfant.validation === 'refusé' && (
+                    <div><span className="text-xs font-semibold px-3 py-1 rounded-full bg-destructive/10 text-destructive">❌ Refusé</span>
+                    {detailEnfant.motifRefus && <p className="text-xs text-destructive mt-1">Motif : {detailEnfant.motifRefus}</p>}</div>
+                  )}
+                  {detailEnfant.desistement && <span className={`text-xs font-semibold px-3 py-1 rounded-full ${detailEnfant.desistement === 'validé' ? 'bg-destructive/10 text-destructive' : 'bg-amber-50 text-amber-700'}`}>{detailEnfant.desistement === 'validé' ? '✓ Désistement validé' : '⏳ Désistement en attente'}</span>}
+                  {detailEnfant.reinscrit && <span className="text-xs font-semibold px-3 py-1 rounded-full bg-primary/10 text-primary">Réinscrit</span>}
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-foreground border-b border-border pb-1">Parent</h3>
+                    <div><span className="text-muted-foreground">Matricule :</span> <span className="font-mono">{detailEnfant.parentMatricule}</span></div>
+                    <div><span className="text-muted-foreground">Nom :</span> {p?.nom}</div>
+                    <div><span className="text-muted-foreground">Prénom :</span> {p?.prenom}</div>
+                    <div><span className="text-muted-foreground">Service :</span> {p?.service}</div>
+                    <div><span className="text-muted-foreground">Email :</span> {p?.email || '—'}</div>
+                    <div><span className="text-muted-foreground">Tél :</span> {p?.telephone || '—'}</div>
+                  </div>
+                  <div className="space-y-3">
+                    <h3 className="font-semibold text-foreground border-b border-border pb-1">Enfant</h3>
+                    <div><span className="text-muted-foreground">Nom :</span> {detailEnfant.nom}</div>
+                    <div><span className="text-muted-foreground">Prénom :</span> {detailEnfant.prenom}</div>
+                    <div><span className="text-muted-foreground">Âge :</span> {calculateAge(detailEnfant.dateNaissance)} ans</div>
+                    <div><span className="text-muted-foreground">Sexe :</span> {detailEnfant.sexe === 'M' ? 'Masculin' : 'Féminin'}</div>
+                    <div><span className="text-muted-foreground">Lien :</span> {detailEnfant.lienParente}</div>
+                    <div><span className="text-muted-foreground">Rang dans la liste :</span> {rangAfficheParDemandeId.get(detailEnfant.demandeId) ?? detailEnfant.rang ?? '—'}</div>
+                  </div>
+                </div>
+                <div className="space-y-2 border-t border-border pt-3">
+                  <h3 className="font-semibold text-foreground">Pièce justificative</h3>
+                  {detailEnfant.justificatifNomFichier ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Fichier : {detailEnfant.justificatifNomFichier}</span>
+                      <Button size="sm" variant="outline" onClick={() => handleVoirJustificatif(detailEnfant)} className="gap-1 text-xs rounded-lg h-8 px-3">
+                        <Eye className="w-3 h-3" />Voir la pièce
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Aucune pièce justificative jointe.</p>
+                  )}
+                </div>
+                <div className="text-xs text-muted-foreground pt-2 border-t border-border">Inscrit le {new Date(detailEnfant.dateInscription).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+              </div>
+            );
+          })()}
+        </motion.div>
+      )}
 
       {/* Detail Dialog */}
-      <Dialog open={!!detailEnfant} onOpenChange={() => setDetailEnfant(null)}>
+      <Dialog open={type !== 'attente_n2' && !!detailEnfant} onOpenChange={() => setDetailEnfant(null)}>
         <DialogContent className="sm:max-w-lg rounded-xl">
           <DialogHeader><DialogTitle className="text-foreground">Détails de la demande</DialogTitle></DialogHeader>
           {detailEnfant && (() => {
@@ -522,6 +619,19 @@ export default function GestionListe({ type }: Props) {
                     <div><span className="text-muted-foreground">Lien :</span> {detailEnfant.lienParente}</div>
                     <div><span className="text-muted-foreground">Rang dans la liste :</span> {rangAfficheParDemandeId.get(detailEnfant.demandeId) ?? detailEnfant.rang ?? '—'}</div>
                   </div>
+                </div>
+                <div className="space-y-2 border-t border-border pt-3">
+                  <h3 className="font-semibold text-foreground">Pièce justificative</h3>
+                  {detailEnfant.justificatifNomFichier ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-muted-foreground">Fichier : {detailEnfant.justificatifNomFichier}</span>
+                      <Button size="sm" variant="outline" onClick={() => handleVoirJustificatif(detailEnfant)} className="gap-1 text-xs rounded-lg h-8 px-3">
+                        <Eye className="w-3 h-3" />Voir la pièce
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Aucune pièce justificative jointe.</p>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground pt-2 border-t border-border">Inscrit le {new Date(detailEnfant.dateInscription).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
               </div>
@@ -579,6 +689,32 @@ export default function GestionListe({ type }: Props) {
             <Button variant="outline" onClick={() => { setRefusOpen(false); setMotifRefus(''); }} className="rounded-lg">Annuler</Button>
             <Button onClick={handleRefuser} disabled={!motifRefus.trim()} className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90">Refuser</Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+        <DialogContent className="sm:max-w-4xl rounded-xl p-0 overflow-hidden">
+          <div className="relative bg-card">
+            <button
+              type="button"
+              onClick={() => setPreviewOpen(false)}
+              className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background hover:bg-muted"
+              aria-label="Fermer l'aperçu"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="px-5 py-4 border-b border-border">
+              <DialogTitle className="text-base text-foreground">Pièce justificative</DialogTitle>
+              <DialogDescription className="pt-1">{previewName}</DialogDescription>
+            </div>
+            <div className="p-4 bg-muted/20">
+              {previewUrl && previewMime.startsWith('image/') ? (
+                <img src={previewUrl} alt={previewName} className="max-h-[70vh] w-full object-contain rounded-md bg-background" />
+              ) : previewUrl ? (
+                <iframe src={previewUrl} title={previewName} className="w-full h-[70vh] rounded-md bg-background" />
+              ) : null}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
