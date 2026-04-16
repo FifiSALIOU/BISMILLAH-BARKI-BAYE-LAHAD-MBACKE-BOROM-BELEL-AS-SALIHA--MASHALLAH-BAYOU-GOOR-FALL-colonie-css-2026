@@ -556,6 +556,7 @@ export default function ParentDashboard() {
             <p className="text-muted-foreground mt-1">
               Matricule : <span className="font-mono tabular-nums text-foreground">{parent.matricule}</span> — {parent.service}
             </p>
+            <p className="text-muted-foreground">Tél : {parent.telephone || '—'}</p>
           </div>
         </motion.div>
 
@@ -592,6 +593,7 @@ export default function ParentDashboard() {
           <p className="text-muted-foreground mt-1">
             Matricule : <span className="font-mono tabular-nums text-foreground">{parent.matricule}</span> — {parent.service}
           </p>
+          <p className="text-muted-foreground">Tél : {parent.telephone || '—'}</p>
         </div>
         {/* Bouton "Inscrire un enfant" masqué à la demande.
         {canInscrire && (
