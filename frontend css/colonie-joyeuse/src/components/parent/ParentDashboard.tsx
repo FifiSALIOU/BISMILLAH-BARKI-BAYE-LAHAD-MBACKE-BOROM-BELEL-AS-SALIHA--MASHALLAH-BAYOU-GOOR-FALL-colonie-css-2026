@@ -546,6 +546,9 @@ export default function ParentDashboard() {
 
   const canInscrire = !inscriptionsCloturees && (MAX === null || enfants.length < MAX);
   const noEnfantCharge = enfants.length === 0;
+  /** Parent sans enfant codifié côté RH : liste vide ou uniquement des inscriptions « Autre » (non biologique). */
+  const parentQueDesNonBio = enfants.every((e) => e.lienParente === 'Autre');
+  const afficherInscriptionNonBio = canInscrire && parentQueDesNonBio;
 
   if (!hasRequiredPhone) {
     return (
@@ -661,7 +664,7 @@ export default function ParentDashboard() {
 
       {/* Vos inscriptions - Cards with actions */}
       <div className="space-y-4">
-        {!noEnfantCharge && <h2 className="text-lg font-semibold text-foreground">Mes enfants</h2>}
+        {enfants.length > 0 && <h2 className="text-lg font-semibold text-foreground">Mes enfants</h2>}
         {noEnfantCharge && (
           <div className="max-w-4xl space-y-4">
             <div className="rounded-xl border border-amber-300/90 bg-amber-50/40 p-5">
@@ -675,7 +678,7 @@ export default function ParentDashboard() {
                 </div>
               </div>
             </div>
-            {canInscrire && (
+            {afficherInscriptionNonBio && (
               <Button onClick={() => setInscrireOpen(true)} variant="outline" className="rounded-lg h-10 px-4 gap-2 text-sm">
                 <UserPlus className="w-4 h-4" />
                 Inscrire un enfant (non biologique)
@@ -683,7 +686,7 @@ export default function ParentDashboard() {
             )}
           </div>
         )}
-        {!noEnfantCharge && (
+        {enfants.length > 0 && (
         <div className="grid gap-4 w-full max-w-4xl">
           {enfants.map((enfant, i) => (
             <motion.div
@@ -824,6 +827,14 @@ export default function ParentDashboard() {
           ))}
         </div>
         )}
+        {afficherInscriptionNonBio && enfants.length > 0 && (
+          <div className="max-w-4xl">
+            <Button onClick={() => setInscrireOpen(true)} variant="outline" className="rounded-lg h-10 px-4 gap-2 text-sm">
+              <UserPlus className="w-4 h-4" />
+              Inscrire un autre enfant (non biologique)
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Tabs: Listes + Liste finale */}
@@ -866,7 +877,7 @@ export default function ParentDashboard() {
           <InscrireEnfant
             onClose={() => setInscrireOpen(false)}
             nbEnfantsInscrits={enfants.length}
-            nonBiologiqueMode={noEnfantCharge}
+            nonBiologiqueMode={parentQueDesNonBio}
             onInscriptionSuccess={() => { void loadAll(); }}
           />
         </DialogContent>
