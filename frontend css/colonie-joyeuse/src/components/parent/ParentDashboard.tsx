@@ -627,9 +627,13 @@ export default function ParentDashboard() {
                   <div className="flex items-center gap-2 min-w-0">
                     <p className="font-semibold text-foreground truncate">{enfant.prenom} {enfant.nom}</p>
                     <span className={`inline-block px-2 py-0.5 rounded-md text-xs font-medium ${
-                      (!hasTitulaire || isNonInscrit(enfant)) ? 'bg-muted text-muted-foreground' : getStatutBadge(enfant.statut)
+                      (enfant.liste === 'attente_n2' && enfant.lienParente === 'Autre')
+                        ? getStatutBadge('Suppléant N2')
+                        : ((!hasTitulaire || isNonInscrit(enfant)) ? 'bg-muted text-muted-foreground' : getStatutBadge(enfant.statut))
                     }`}>
-                      {(!hasTitulaire || isNonInscrit(enfant)) ? 'Non inscrit' : enfant.statut}
+                      {(!hasTitulaire || isNonInscrit(enfant))
+                        ? (enfant.liste === 'attente_n2' && enfant.lienParente === 'Autre' ? 'Suppléant N2' : 'Non inscrit')
+                        : enfant.statut}
                     </span>
                   </div>
                   <div className="flex gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
@@ -681,7 +685,10 @@ export default function ParentDashboard() {
                 {/* Lien de parenté masqué à l'affichage (Père/Mère) à la demande.
                 <p className="text-sm text-muted-foreground">{calculateAge(enfant.dateNaissance)} ans — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'} — {enfant.lienParente}</p>
                 */}
-                <p className="text-sm text-muted-foreground">Né(e) le {new Date(enfant.dateNaissance).toLocaleDateString('fr-FR')} — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'}</p>
+                <p className="text-sm text-muted-foreground">
+                  Né(e) le {new Date(enfant.dateNaissance).toLocaleDateString('fr-FR')} — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'}
+                  {enfant.lienParente === 'Autre' ? ' — Enfant non biologique' : ''}
+                </p>
                   
                   {/*
                   Ancien affichage (le rang était toujours visible, y compris après désistement) :

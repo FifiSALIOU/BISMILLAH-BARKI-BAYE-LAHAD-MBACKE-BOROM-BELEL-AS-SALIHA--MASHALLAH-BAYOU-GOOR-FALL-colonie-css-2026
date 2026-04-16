@@ -492,11 +492,13 @@ export default function GestionListe({ type }: Props) {
                               <Eye className="w-3 h-3" />Détails
                             </Button>
                           )}
+                          {/* Bouton "Justificatif" masqué à la demande.
                           {type === 'attente_n2' && !!e.justificatifNomFichier && (
                             <Button size="sm" variant="outline" onClick={() => handleVoirJustificatif(e)} className="gap-1 text-xs rounded-lg h-8 px-3">
                               <Eye className="w-3 h-3" />Justificatif
                             </Button>
                           )}
+                          */}
                           {type === 'attente_n2' && !!e.justificatifNomFichier && e.justificatifValide == null && (
                             <>
                               <Button size="sm" onClick={() => handleValiderJustificatif(e)} className="gap-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3">
@@ -506,6 +508,11 @@ export default function GestionListe({ type }: Props) {
                                 <ThumbsDown className="w-3 h-3" />Refus définitif
                               </Button>
                             </>
+                          )}
+                          {type === 'attente_n2' && !!e.justificatifNomFichier && e.justificatifValide != null && (
+                            <Button size="sm" variant="outline" onClick={() => setDetailEnfant(e)} className="gap-1 text-xs rounded-lg h-8 px-3">
+                              <Eye className="w-3 h-3" />Voir détails
+                            </Button>
                           )}
                         </div>
                       </TableCell>
