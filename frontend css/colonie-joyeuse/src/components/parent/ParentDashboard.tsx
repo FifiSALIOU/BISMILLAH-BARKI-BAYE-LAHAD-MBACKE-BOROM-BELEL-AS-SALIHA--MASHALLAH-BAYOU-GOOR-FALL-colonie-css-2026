@@ -19,7 +19,7 @@ import {
   idDemandePourRang,
   rangAfficheParDemandeIdPourEnfants,
 } from '@/lib/ordreArriveeListe';
-import { Users, UserCheck, Clock, Star, Award, AlertTriangle, Lock, UserPlus, ArrowUpDown, HandMetal, XCircle, RotateCcw, Hash, Search, User, FilePenLine } from 'lucide-react';
+import { Users, UserCheck, Clock, Star, Award, AlertTriangle, Lock, UserPlus, ArrowUpDown, HandMetal, XCircle, RotateCcw, Hash, Search, User, FilePenLine, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -39,7 +39,7 @@ const LIEN_PARENTE_FR_TO_API: Record<string, LienParenteApi> = {
 };
 
 export default function ParentDashboard() {
-  const { parent, token } = useAuth();
+  const { parent, token, refreshParentProfile } = useAuth();
   const { settings, addHistorique } = useInscription();
 
   const [mesEnfants, setMesEnfants] = useState<Enfant[]>([]);
@@ -117,6 +117,8 @@ export default function ParentDashboard() {
   const [highlightedEnfantId, setHighlightedEnfantId] = useState<string | null>(null);
   const tabsRef = useRef<HTMLDivElement>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [phoneInput, setPhoneInput] = useState('');
+  const [phoneSaving, setPhoneSaving] = useState(false);
 
   useEffect(() => {
     if (!listeFinaleApiPubliee && activeTab === 'liste_finale') {
@@ -124,7 +126,38 @@ export default function ParentDashboard() {
     }
   }, [listeFinaleApiPubliee, activeTab]);
 
+  useEffect(() => {
+    setPhoneInput(parent?.telephone || '');
+  }, [parent?.telephone]);
+
   if (!parent) return null;
+
+  const phoneRaw = (parent.telephone || '').trim();
+  const hasRequiredPhone = !!phoneRaw && phoneRaw !== '-' && !phoneRaw.startsWith('tel:');
+
+  const saveRequiredPhone = async () => {
+    const tel = phoneInput.trim();
+    if (!tel) {
+      toast({ title: 'Numéro requis', description: 'Veuillez saisir votre numéro de téléphone.', variant: 'destructive' });
+      return;
+    }
+    if (!token) return;
+    setPhoneSaving(true);
+    try {
+      await apiRequest('/parent/telephone', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ telephone: tel }),
+      });
+      await refreshParentProfile();
+      toast({ title: 'Numéro enregistré', description: 'Votre numéro de téléphone a été enregistré.' });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Impossible d’enregistrer le numéro.';
+      toast({ title: 'Erreur', description: msg, variant: 'destructive' });
+    } finally {
+      setPhoneSaving(false);
+    }
+  };
 
   const now = new Date();
   const dateFin = settings.dateFinInscriptions ? new Date(settings.dateFinInscriptions + 'T23:59:59') : null;
@@ -513,6 +546,43 @@ export default function ParentDashboard() {
 
   const canInscrire = !inscriptionsCloturees && (MAX === null || enfants.length < MAX);
   const noEnfantCharge = enfants.length === 0;
+
+  if (!hasRequiredPhone) {
+    return (
+      <div className="w-full max-w-5xl space-y-8 pl-[170px]">
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Bienvenue, {parent.prenom} {parent.nom}</h1>
+            <p className="text-muted-foreground mt-1">
+              Matricule : <span className="font-mono tabular-nums text-foreground">{parent.matricule}</span> — {parent.service}
+            </p>
+          </div>
+        </motion.div>
+
+        <div className="max-w-xl mx-auto w-full">
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-xl shadow-card border border-border p-6 space-y-4">
+            <h2 className="text-3xl font-bold text-foreground flex items-center gap-2">
+              <Phone className="w-6 h-6 text-accent" />
+              Numéro de téléphone obligatoire
+            </h2>
+            <p className="text-muted-foreground">Vous devez renseigner votre numéro de téléphone avant de pouvoir inscrire vos enfants et faire vos sélections.</p>
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-foreground">Numéro de téléphone</label>
+              <Input
+                value={phoneInput}
+                onChange={(e) => setPhoneInput(e.target.value)}
+                placeholder="Ex: 70 00 00 00"
+                className="h-11 rounded-lg"
+              />
+            </div>
+            <Button onClick={() => void saveRequiredPhone()} disabled={phoneSaving || !phoneInput.trim()} className="w-full rounded-lg bg-accent text-white hover:bg-accent/90">
+              {phoneSaving ? 'Enregistrement...' : 'Enregistrer mon numéro'}
+            </Button>
+          </motion.div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-5xl space-y-8 pl-[170px]">

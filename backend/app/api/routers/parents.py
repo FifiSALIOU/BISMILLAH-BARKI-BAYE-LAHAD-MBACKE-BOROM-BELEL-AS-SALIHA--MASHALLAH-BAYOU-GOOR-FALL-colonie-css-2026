@@ -6,6 +6,7 @@ from uuid import uuid4
 from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -34,7 +35,11 @@ from app.services.inscriptions import (
     set_suppleant_n1,
     set_titulaire,
 )
-from app.services.users import TELEPHONE_DEJA_UTILISE_DETAIL
+from app.services.users import (
+    TELEPHONE_DEJA_UTILISE_DETAIL,
+    normalize_parent_telephone_for_storage,
+    raise_if_parent_telephone_conflict,
+)
 from app.services.email import send_email, uniq_emails
 from app.services.notify_helpers import collect_admin_emails
 from app.services.liste_finale_compute import demandes_liste_finale_retenus_si_cloturees
@@ -55,6 +60,10 @@ router = APIRouter(prefix="/parent", tags=["parent"])
 _JUSTIFICATIFS_DIR = Path(__file__).resolve().parents[3] / "data" / "justificatifs"
 
 
+class ParentTelephoneIn(BaseModel):
+    telephone: str = Field(..., min_length=3, max_length=191)
+
+
 def _save_justificatif_file(upload: UploadFile) -> tuple[str, str, str | None, int]:
     _JUSTIFICATIFS_DIR.mkdir(parents=True, exist_ok=True)
     original = (upload.filename or "document").strip() or "document"
@@ -64,6 +73,38 @@ def _save_justificatif_file(upload: UploadFile) -> tuple[str, str, str | None, i
     content = upload.file.read()
     target.write_bytes(content)
     return (str(target), safe_name[:255], upload.content_type, len(content))
+
+
+@router.post("/telephone")
+def update_parent_telephone(
+    payload: ParentTelephoneIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.PARENT)),
+):
+    parent = db.query(Parent).filter(Parent.user_id == user.id).first()
+    if parent is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent introuvable.")
+
+    tel = (payload.telephone or "").strip()
+    if not tel:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Numéro de téléphone requis.")
+
+    tel_stash = normalize_parent_telephone_for_storage(tel, matricule=parent.matricule)
+    raise_if_parent_telephone_conflict(db, tel_stash=tel_stash, parent=parent)
+    parent.telephone = tel_stash
+    try:
+        db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        raw = str(getattr(e, "orig", e) or e).lower()
+        if "telephone" in raw or "parents_telephone" in raw:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=TELEPHONE_DEJA_UTILISE_DETAIL,
+            ) from None
+        raise
+    db.refresh(parent)
+    return {"ok": True, "telephone": parent.telephone}
 
 
 def _save_justificatifs_files(uploads: list[UploadFile]) -> tuple[str, str, str | None, int]:
