@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, text
@@ -28,6 +28,7 @@ from app.services.inscriptions import (
     _next_rang_for_liste,
 )
 from app.services.liste_finale_compute import demandes_liste_finale_retenus_si_cloturees, inscriptions_cloturees
+from app.services.enfants_import_superadmin import import_enfants_fichier_superadmin
 from app.services.liste_finale_lock import raise_if_liste_finale_definitive
 from app.services.notify_helpers import collect_admin_emails
 from app.services.runtime_settings_store import (
@@ -1241,3 +1242,33 @@ def valider_desistement(
     #         ),
     #     )
     return {"ok": True}
+
+
+@router.post("/parents/enfants/import-csv")
+def import_enfants_parents_csv(
+    file: UploadFile = File(
+        ...,
+        description="CSV UTF-8 ou Excel .xlsx : matricule_parent, prenom, nom, date_naissance, sexe, lien_parente",
+    ),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
+):
+    """
+    Charge des enfants « codifiés » pour les comptes parents (création `Enfant` + synchronisation des demandes
+    via la logique métier existante `auto_sync_enfants_eligibles_du_parent`). Réservé au super administrateur.
+    Accepte un fichier **CSV (UTF-8)** ou **Excel .xlsx** (première feuille, ligne d’en-têtes).
+    """
+    _ = user
+    raise_if_liste_finale_definitive()
+    raw = file.file.read()
+    if not raw or len(raw) > 5_000_000:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Fichier vide ou trop volumineux (max. 5 Mo).",
+        )
+
+    out = import_enfants_fichier_superadmin(db, raw, file.filename or "")
+    if not out.get("ok"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=out.get("error") or "Import impossible.")
+    db.commit()
+    return out

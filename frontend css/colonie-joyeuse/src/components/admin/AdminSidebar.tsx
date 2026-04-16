@@ -4,7 +4,7 @@ import {
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarMenuSub, SidebarMenuSubItem, SidebarMenuSubButton,
   useSidebar,
 } from '@/components/ui/sidebar';
-import { LayoutDashboard, FileText, List, BarChart3, Users, Settings, ChevronDown, /* Award, */ History, Database, ListChecks, MapPin, Briefcase } from 'lucide-react';
+import { LayoutDashboard, FileText, List, BarChart3, Users, Settings, ChevronDown, /* Award, */ History, Database, ListChecks, MapPin, Briefcase, Baby } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import logo from '@/assets/logo.png';
 
@@ -217,6 +217,15 @@ export function AdminSidebar({ currentPage, onNavigate, isSuperAdmin }: Props) {
                 <SidebarMenuItem>
                   <SidebarMenuButton onClick={() => onNavigate('utilisateurs')} isActive={currentPage === 'utilisateurs'} tooltip="Utilisateurs">
                     <Users className="w-4 h-4" />{!collapsed && <span>Utilisateurs</span>}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    onClick={() => onNavigate('chargement_enfants')}
+                    isActive={currentPage === 'chargement_enfants'}
+                    tooltip="Enfants codifiés (import CSV)"
+                  >
+                    <Baby className="w-4 h-4" />{!collapsed && <span>Enfants</span>}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>

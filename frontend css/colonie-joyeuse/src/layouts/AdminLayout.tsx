@@ -12,6 +12,7 @@ import ListeFinale from '@/components/admin/ListeFinale';
 import Statistiques from '@/components/admin/Statistiques';
 import GestionUtilisateurs from '@/components/admin/GestionUtilisateurs';
 import GestionParents from '@/components/admin/GestionParents';
+import ChargementEnfantsSuperAdmin from '@/components/admin/ChargementEnfantsSuperAdmin';
 import Parametres from '@/components/admin/Parametres';
 import Historique from '@/components/admin/Historique';
 import JournalLogs from '@/components/admin/JournalLogs';
@@ -55,6 +56,7 @@ export default function AdminLayout({ initialPage }: Props) {
     historique: '/dashboard/historique',
     utilisateurs: '/dashboard/admin/utilisateurs',
     parents_list: '/dashboard/admin/envoi-mails',
+    chargement_enfants: '/dashboard/admin/enfants',
     envoie_sms: '/dashboard/admin/envoi-sms',
     journal_logs: '/dashboard/admin/journal',
     parametres: '/dashboard/admin/parametres',
@@ -82,6 +84,7 @@ export default function AdminLayout({ initialPage }: Props) {
       case 'historique': return <Historique />;
       case 'utilisateurs': return isSuperAdmin ? <GestionUtilisateurs /> : <AdminDashboard />;
       case 'parents_list': return isSuperAdmin ? <GestionParents /> : <AdminDashboard />;
+      case 'chargement_enfants': return isSuperAdmin ? <ChargementEnfantsSuperAdmin /> : <AdminDashboard />;
       case 'envoie_sms': return isSuperAdmin ? <div className="p-6"><h1 className="text-2xl font-bold text-foreground">Envoie SMS</h1><p className="text-muted-foreground mt-2">Cette fonctionnalité sera bientôt disponible.</p></div> : <AdminDashboard />;
       case 'journal_logs': return isSuperAdmin ? <JournalLogs /> : <AdminDashboard />;
       case 'parametres': return isSuperAdmin ? <Parametres /> : <AdminDashboard />;

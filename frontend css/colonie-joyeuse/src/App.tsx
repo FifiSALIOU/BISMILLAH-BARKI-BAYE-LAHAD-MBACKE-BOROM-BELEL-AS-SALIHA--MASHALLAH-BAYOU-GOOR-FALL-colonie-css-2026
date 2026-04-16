@@ -39,6 +39,7 @@ const App = () => (
               <Route path="/dashboard/admin" element={<Index page="admin_dashboard" />} />
               <Route path="/dashboard/admin/utilisateurs" element={<Index page="utilisateurs" />} />
               <Route path="/dashboard/admin/envoi-mails" element={<Index page="parents_list" />} />
+              <Route path="/dashboard/admin/enfants" element={<Index page="chargement_enfants" />} />
               <Route path="/dashboard/admin/envoi-sms" element={<Index page="envoie_sms" />} />
               <Route path="/dashboard/admin/journal" element={<Index page="journal_logs" />} />
               <Route path="/dashboard/admin/parametres" element={<Index page="parametres" />} />
