@@ -24,6 +24,7 @@ from app.schemas.inscriptions import (
 )
 from app.services.historique_metier import append_historique_best_effort
 from app.services.inscriptions import (
+    _date_naissance_dans_plage,
     _next_rang_for_liste,
     auto_sync_enfants_eligibles_du_parent,
     cancel_desistement,
@@ -214,11 +215,18 @@ def creer_inscription_non_biologique_n2(
     if parent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent introuvable.")
 
-    # Réservé au cas N2 demandé : parent sans enfants biologiques préchargés.
-    if db.query(Enfant).filter(Enfant.parent_id == parent.id).first() is not None:
+    # Réservé au cas N2 « non biologique » : pas d’enfant biologique / codifié (lien ≠ Autre).
+    # Les enfants déjà créés par cette même voie (lien Autre) ne bloquent pas une nouvelle demande.
+    a_un_enfant_biologique_ou_codifie = (
+        db.query(Enfant)
+        .filter(Enfant.parent_id == parent.id, Enfant.lien_parente != LienParente.AUTRE)
+        .first()
+        is not None
+    )
+    if a_un_enfant_biologique_ou_codifie:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cette action est réservée aux parents sans enfant préchargé.",
+            detail="Cette action est réservée aux parents sans enfant préchargé (biologique).",
         )
 
     if enfant_sexe not in ("M", "F"):
@@ -286,7 +294,7 @@ def mes_demandes(
         .order_by(DemandeInscription.date_inscription.asc())
         .all()
     )
-    return [_to_demande_out(db, d) for d in demandes]
+    return [_to_demande_out(db, d) for d in demandes if _date_naissance_dans_plage(d.enfant.date_naissance)]
 
 
 @router.put("/demandes/{demande_id}", response_model=DemandeOut)

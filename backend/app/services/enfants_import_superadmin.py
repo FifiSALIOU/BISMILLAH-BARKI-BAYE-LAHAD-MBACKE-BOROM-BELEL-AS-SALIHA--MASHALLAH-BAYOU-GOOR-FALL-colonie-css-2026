@@ -14,9 +14,6 @@ from sqlalchemy.orm import Session, joinedload
 from app.models.enums import LienParente, Sexe, UserRole
 from app.models.models import Enfant, User
 from app.services.inscriptions import auto_sync_enfants_eligibles_du_parent, _date_naissance_dans_plage
-from app.services.runtime_settings_store import get_max_enfants_par_parent
-
-_DEFAULT_MAX = 2
 
 _HEADER_ALIASES: dict[str, tuple[str, ...]] = {
     "matricule_parent": ("matricule_parent", "matricule", "matricule_agent"),
@@ -155,7 +152,6 @@ def _process_enfants_import_rows(db: Session, raw_rows: list[list[str]]) -> dict
             ),
         }
 
-    max_enfants = get_max_enfants_par_parent(_DEFAULT_MAX)
     results: list[dict[str, Any]] = []
     parents_to_sync: dict[int, User] = {}
 
@@ -223,15 +219,6 @@ def _process_enfants_import_rows(db: Session, raw_rows: list[list[str]]) -> dict
 
         parent = u.parent_profile
         existing = db.query(Enfant).filter(Enfant.parent_id == parent.id).all()
-        if len(existing) >= max_enfants:
-            results.append(
-                {
-                    "ligne": ligne_no,
-                    "ok": False,
-                    "message": f"Nombre maximum d'enfants ({max_enfants}) déjà atteint pour ce parent.",
-                },
-            )
-            continue
 
         np, nn = _norm_name(prenom), _norm_name(nom)
         if any(

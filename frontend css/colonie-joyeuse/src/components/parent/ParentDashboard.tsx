@@ -21,6 +21,7 @@ import {
 } from '@/lib/ordreArriveeListe';
 import { Users, UserCheck, Clock, Star, Award, AlertTriangle, Lock, UserPlus, ArrowUpDown, HandMetal, XCircle, RotateCcw, Hash, Search, User, FilePenLine, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -130,6 +131,21 @@ export default function ParentDashboard() {
     setPhoneInput(parent?.telephone || '');
   }, [parent?.telephone]);
 
+  const enfantsMesEligibles = useMemo(() => {
+    const lo = settings.ageMin;
+    const hi = settings.ageMax;
+    return mesEnfants.filter((e) => {
+      const y = new Date(e.dateNaissance).getFullYear();
+      return y >= lo && y <= hi;
+    });
+  }, [mesEnfants, settings.ageMin, settings.ageMax]);
+
+  const placesListesParentSaison = useMemo(() => {
+    const occupeTitulaire = enfantsMesEligibles.some((e) => e.statut === 'Titulaire' && !e.desistement);
+    const occupeN1 = enfantsMesEligibles.some((e) => e.liste === 'attente_n1' && !e.desistement);
+    return (occupeTitulaire ? 1 : 0) + (occupeN1 ? 1 : 0);
+  }, [enfantsMesEligibles]);
+
   if (!parent) return null;
 
   const phoneRaw = (parent.telephone || '').trim();
@@ -185,10 +201,11 @@ export default function ParentDashboard() {
     }
     return out;
   }, [allEnfants]);
-  const allDesistes = inscriptionsCloturees && enfants.length > 0 && enfants.every(e => e.desistement === 'validé');
-  const titulaire = enfants.find(e => e.statut === 'Titulaire');
-  const suppN1 = enfants.find(e => e.liste === 'attente_n1');
-  const suppN2 = enfants.find(e => e.statut === 'Suppléant N2');
+  const allDesistes =
+    inscriptionsCloturees && enfantsMesEligibles.length > 0 && enfantsMesEligibles.every((e) => e.desistement === 'validé');
+  const titulaire = enfantsMesEligibles.find((e) => e.statut === 'Titulaire');
+  const suppN1 = enfantsMesEligibles.find((e) => e.liste === 'attente_n1');
+  const suppN2 = enfantsMesEligibles.find((e) => e.statut === 'Suppléant N2');
 
   /** Identifiants de demandes réellement dans la liste finale publiée (après clôture) — pas la simple validation des infos. */
   const demandeIdsListeFinaleRetenus = useMemo(() => {
@@ -200,14 +217,20 @@ export default function ParentDashboard() {
   }, [listeFinaleApiEnfants]);
 
   const enfantsRetenusListeFinale = listeFinaleApiPubliee
-    ? enfants.filter((e) => typeof e.demandeId === 'number' && demandeIdsListeFinaleRetenus.has(e.demandeId))
+    ? enfantsMesEligibles.filter(
+        (e) => typeof e.demandeId === 'number' && demandeIdsListeFinaleRetenus.has(e.demandeId),
+      )
     : [];
 
-  const enfantN1 = enfants.find(e => e.liste === 'attente_n1' && !e.desistement);
-  const hasTitulaire = enfants.some((e) => e.statut === 'Titulaire');
-  const hasSuppleantN1 = enfants.some((e) => e.liste === 'attente_n1' && !e.desistement);
+  const enfantN1 = enfantsMesEligibles.find((e) => e.liste === 'attente_n1' && !e.desistement);
+  const hasTitulaire = enfantsMesEligibles.some((e) => e.statut === 'Titulaire');
+  const hasSuppleantN1 = enfantsMesEligibles.some((e) => e.liste === 'attente_n1' && !e.desistement);
   const isNonInscrit = (e: Enfant) =>
     e.rangListe == null && e.liste === 'attente_n2' && e.lienParente !== 'Autre' && e.statut !== 'Titulaire';
+
+  const capListesTitulaireN1Atteint = MAX != null && placesListesParentSaison >= MAX;
+  const actionsTitulaireN1BloqueesPourCarte = (e: Enfant) =>
+    capListesTitulaireN1Atteint && isNonInscrit(e) && e.lienParente !== 'Autre';
   const getDemandeIdForAction = (e: Enfant | undefined): number | null => {
     if (!e) return null;
     if (typeof e.demandeId === 'number' && Number.isFinite(e.demandeId)) return e.demandeId;
@@ -544,11 +567,11 @@ export default function ParentDashboard() {
     );
   };
 
-  const canInscrire = !inscriptionsCloturees && (MAX === null || enfants.length < MAX);
+  const canInscrire = !inscriptionsCloturees && (MAX === null || placesListesParentSaison < MAX);
   const noEnfantCharge = enfants.length === 0;
   /** Parent sans enfant codifié côté RH : liste vide ou uniquement des inscriptions « Autre » (non biologique). */
   const parentQueDesNonBio = enfants.every((e) => e.lienParente === 'Autre');
-  const afficherInscriptionNonBio = canInscrire && parentQueDesNonBio;
+  const afficherInscriptionNonBio = !inscriptionsCloturees && parentQueDesNonBio;
 
   if (!hasRequiredPhone) {
     return (
@@ -664,7 +687,7 @@ export default function ParentDashboard() {
 
       {/* Vos inscriptions - Cards with actions */}
       <div className="space-y-4">
-        {enfants.length > 0 && <h2 className="text-lg font-semibold text-foreground">Mes enfants</h2>}
+        {enfantsMesEligibles.length > 0 && <h2 className="text-lg font-semibold text-foreground">Mes enfants</h2>}
         {noEnfantCharge && (
           <div className="max-w-4xl space-y-4">
             <div className="rounded-xl border border-amber-300/90 bg-amber-50/40 p-5">
@@ -686,15 +709,31 @@ export default function ParentDashboard() {
             )}
           </div>
         )}
-        {enfants.length > 0 && (
+        {capListesTitulaireN1Atteint &&
+          enfantsMesEligibles.some((e) => isNonInscrit(e) && e.lienParente !== 'Autre') &&
+          !inscriptionsCloturees && (
+            <Alert className="max-w-4xl border-amber-200 bg-amber-50/60">
+              <AlertTitle>Maximum atteint pour cette saison</AlertTitle>
+              <AlertDescription>
+                Vous avez atteint le maximum d&apos;enfants autorisé pour la saison sur les rôles Titulaire et
+                Suppléant N°1 ({MAX} enfant{MAX != null && MAX > 1 ? 's' : ''}
+                {settings.colonieNom ? ` — ${settings.colonieNom}` : ''}). Les autres enfants éligibles restent
+                visibles ci-dessous ; pour les positionner sur ces listes, modifiez d&apos;abord vos choix
+                (désistement, changement de titulaire, etc.).
+              </AlertDescription>
+            </Alert>
+          )}
+        {enfantsMesEligibles.length > 0 && (
         <div className="grid gap-4 w-full max-w-4xl">
-          {enfants.map((enfant, i) => (
+          {enfantsMesEligibles.map((enfant, i) => (
             <motion.div
               key={enfant.id}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 + 0.1 * i }}
-              className="w-full rounded-xl border border-border bg-card cursor-pointer hover:shadow-md transition-shadow shadow-card"
+              className={`w-full rounded-xl border border-border bg-card cursor-pointer hover:shadow-md transition-shadow shadow-card ${
+                actionsTitulaireN1BloqueesPourCarte(enfant) ? 'opacity-60 border-dashed' : ''
+              }`}
               onClick={() => handleCardClick(enfant)}
             >
               <div className="p-4 space-y-2">
@@ -712,7 +751,13 @@ export default function ParentDashboard() {
                     </span>
                   </div>
                   <div className="flex gap-2 flex-wrap" onClick={e => e.stopPropagation()}>
-                    {!inscriptionsCloturees && enfant.lienParente !== 'Autre' && !enfant.desistement && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && enfant.statut !== 'Titulaire' && (
+                    {!inscriptionsCloturees &&
+                      enfant.lienParente !== 'Autre' &&
+                      !enfant.desistement &&
+                      !enfant.rejetDefinitif &&
+                      !listeFinaleDefinitiveApi &&
+                      enfant.statut !== 'Titulaire' &&
+                      !actionsTitulaireN1BloqueesPourCarte(enfant) && (
                       <>
                         {(!hasTitulaire || enfant.statut === 'Suppléant N1') && (
                           <Button
@@ -827,7 +872,7 @@ export default function ParentDashboard() {
           ))}
         </div>
         )}
-        {afficherInscriptionNonBio && enfants.length > 0 && (
+        {afficherInscriptionNonBio && enfantsMesEligibles.length > 0 && (
           <div className="max-w-4xl">
             <Button onClick={() => setInscrireOpen(true)} variant="outline" className="rounded-lg h-10 px-4 gap-2 text-sm">
               <UserPlus className="w-4 h-4" />

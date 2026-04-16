@@ -9,16 +9,13 @@ from sqlalchemy.orm import Session
 from app.models.enums import DemandeStatut, LienParente, ListeCode, Sexe
 from app.models.models import DemandeInscription, Enfant, Liste, Parent, Service, User
 from app.services.liste_finale_lock import raise_if_liste_finale_definitive
-from app.services.runtime_settings_store import get_max_enfants_par_parent
+from app.services.runtime_settings_store import merged_runtime_settings
 from app.services.users import (
     _get_or_create_site,
     normalize_parent_nin_for_storage,
     normalize_parent_telephone_for_storage,
     raise_if_parent_telephone_conflict,
 )
-
-DEFAULT_MAX_ENFANTS_PAR_PARENT = 2
-
 
 def demande_compte_pour_rang_actif(d: DemandeInscription) -> bool:
     """Rangs visibles 1..n : SOUMISE et RETENUE. NON_VALIDEE et DESISTEE : queue (renumérotation inchangée : `*_sorted` puis refoulement)."""
@@ -33,17 +30,26 @@ def _require_not_rejet_definitif(demande: DemandeInscription) -> None:
         )
 
 
+def _plage_naissance_annees() -> tuple[int, int]:
+    s = merged_runtime_settings()
+    lo = int(s.get("ageMin", 2012))
+    hi = int(s.get("ageMax", 2019))
+    return lo, hi
+
+
 def _validate_annee_naissance(d: date) -> None:
-    annee = d.year
-    if annee < 2012 or annee > 2019:
+    annee = int(d.year)
+    if not _date_naissance_dans_plage(d):
+        lo, hi = _plage_naissance_annees()
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Inscription rejetée : année de naissance invalide ({annee}). Doit être entre 2012 et 2019.",
+            detail=f"Inscription rejetée : année de naissance invalide ({annee}). Doit être entre {lo} et {hi}.",
         )
 
 
 def _date_naissance_dans_plage(d: date) -> bool:
-    return 2012 <= int(d.year) <= 2019
+    lo, hi = _plage_naissance_annees()
+    return lo <= int(d.year) <= hi
 
 
 def _get_or_create_service(db: Session, nom: str) -> Service:
@@ -186,11 +192,6 @@ def resequence_rangs_apres_desistement_valide(db: Session, liste_id: int) -> Non
     db.flush()
 
 
-def _get_max_enfants_par_parent(db: Session) -> int:
-    _ = db
-    return get_max_enfants_par_parent(DEFAULT_MAX_ENFANTS_PAR_PARENT)
-
-
 def _compute_target_liste_code(*, lien_parente: LienParente, inscription_index: int) -> ListeCode:
     """inscription_index : 1 = 1er enfant inscrit pour ce parent, 2 = 2e, 3 = 3e, etc."""
     if inscription_index < 1:
@@ -283,7 +284,6 @@ def create_inscription_for_parent_user(
 
     raise_if_parent_telephone_conflict(db, tel_stash=tel_stash, parent=parent)
 
-    max_enfants = _get_max_enfants_par_parent(db)
     # Compte les enfants qui ont au moins une demande (évite de bloquer si une demande a été
     # supprimée en SQL sans supprimer la ligne `enfants`, qui ne s'affiche plus côté parent).
     nb_enfants_avec_demande = (
@@ -294,11 +294,6 @@ def create_inscription_for_parent_user(
         .scalar()
         or 0
     )
-    if nb_enfants_avec_demande >= max_enfants:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Inscription impossible : vous avez déjà inscrit {max_enfants} enfants (maximum autorisé).",
-        )
 
     inscription_index = nb_enfants_avec_demande + 1
     is_first_child = inscription_index == 1
@@ -338,7 +333,7 @@ def create_inscription_for_parent_user(
 
 
 def auto_sync_enfants_eligibles_du_parent(*, db: Session, user: User) -> None:
-    """Crée les demandes manquantes pour les enfants existants du parent connecté (nés entre 2012 et 2019)."""
+    """Crée une demande « vierge » pour chaque enfant éligible (plage d'âge paramétrée) sans demande."""
     parent = db.query(Parent).filter(Parent.user_id == user.id).first()
     if parent is None:
         return
@@ -359,8 +354,6 @@ def auto_sync_enfants_eligibles_du_parent(*, db: Session, user: User) -> None:
     if not enfants_eligibles:
         return
 
-    max_enfants = _get_max_enfants_par_parent(db)
-
     existantes = (
         db.query(DemandeInscription)
         .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
@@ -368,13 +361,10 @@ def auto_sync_enfants_eligibles_du_parent(*, db: Session, user: User) -> None:
         .all()
     )
     demande_by_enfant_id = {int(d.enfant_id): d for d in existantes}
-    deja_avec_demande = len(demande_by_enfant_id)
 
     for enfant in enfants_eligibles:
         if int(enfant.id) in demande_by_enfant_id:
             continue
-        if deja_avec_demande >= max_enfants:
-            break
 
         # Aucun rang/liste en base tant que le parent n'a pas fait ses choix.
         enfant.is_titulaire = False
@@ -390,7 +380,6 @@ def auto_sync_enfants_eligibles_du_parent(*, db: Session, user: User) -> None:
         db.add(demande)
         db.flush()
         demande_by_enfant_id[int(enfant.id)] = demande
-        deja_avec_demande += 1
 
 
 def set_titulaire(*, db: Session, user: User, enfant_id_titulaire: int) -> None:

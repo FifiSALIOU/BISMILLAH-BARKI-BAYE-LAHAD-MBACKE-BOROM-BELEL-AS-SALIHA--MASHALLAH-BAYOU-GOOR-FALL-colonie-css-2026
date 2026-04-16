@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
-import { AlertTriangle, CheckCircle2, UserPlus, Star, Clock, PartyPopper, X, Upload } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, UserPlus, Star, Clock, X, Upload } from 'lucide-react';
 import { apiRequest } from '@/lib/api';
 
 /** Valeurs attendues par l'API (`LienParente`) — libellés FR pour l'affichage */
@@ -45,7 +45,6 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
   const [successOpen, setSuccessOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [showNextPrompt, setShowNextPrompt] = useState(false);
-  const [showMaxReachedPopup, setShowMaxReachedPopup] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [justificatifFiles, setJustificatifFiles] = useState<File[]>([]);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -56,7 +55,6 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
 
   if (!parent) return null;
 
-  const MAX_ENFANTS = settings.maxEnfantsParParent;
   const enfants = getEnfantsByParent(parent.matricule);
   const nbInscrits = nbEnfantsInscrits !== undefined ? nbEnfantsInscrits : enfants.length;
 
@@ -98,12 +96,6 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
   }, [previewOpen, previewUrl]);
 
   const handleSubmit = () => {
-    if (MAX_ENFANTS !== null && nbInscrits >= MAX_ENFANTS) {
-      setErrorTitle("Limite d'inscription atteinte");
-      setErrorMessage(`Vous avez atteint le maximum autorisé de ${MAX_ENFANTS} inscriptions par agent.`);
-      setErrorOpen(true);
-      return;
-    }
     if (!prenom.trim() || !nom.trim() || !dateNaissance || !sexe || (!nonBiologiqueMode && !lienParente) || (!nonBiologiqueMode && !telephone.trim())) {
       setErrorTitle("Champs requis");
       setErrorMessage("Veuillez remplir tous les champs obligatoires du formulaire.");
@@ -201,15 +193,10 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
     }
 
     const listeLabel = liste === 'principale' ? 'Liste Principale (Titulaire)' : liste === 'attente_n1' ? "Liste d'Attente N°1 (Suppléant)" : "Liste d'Attente N°2";
-    const isLastChild = MAX_ENFANTS !== null && nbInscrits + 1 >= MAX_ENFANTS;
 
-    if (isLastChild) {
-      setShowMaxReachedPopup(true);
-    } else {
-      setSuccessMessage(`${prenom} ${nom} a été inscrit(e) avec succès dans la ${listeLabel}.`);
-      setSuccessOpen(true);
-      setShowNextPrompt(true);
-    }
+    setSuccessMessage(`${prenom} ${nom} a été inscrit(e) avec succès dans la ${listeLabel}.`);
+    setSuccessOpen(true);
+    setShowNextPrompt(true);
     resetForm();
   };
 
@@ -227,36 +214,17 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
   };
   const currentChildLabel = getChildLabel();
 
-  if (MAX_ENFANTS !== null && nbInscrits >= MAX_ENFANTS) {
-    return (
-      <div className="max-w-2xl mx-auto">
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-xl shadow-card border border-border p-8 text-center space-y-4">
-          <div className="w-16 h-16 rounded-full bg-accent/10 flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-8 h-8 text-accent" />
-          </div>
-          <h2 className="text-xl font-bold text-foreground">Inscriptions complètes</h2>
-          <p className="text-muted-foreground">Vous avez inscrit le maximum de {MAX_ENFANTS} enfants pour la saison 2026. Consultez la section "Mes enfants" pour gérer vos inscriptions.</p>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <div className={`mx-auto space-y-6 ${nonBiologiqueMode ? 'max-w-xl' : 'max-w-3xl'}`}>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold text-foreground">Inscrire un enfant</h1>
         {!nonBiologiqueMode && (
-          <p className="text-muted-foreground mt-1">Inscription {nbInscrits + 1}/{MAX_ENFANTS ?? '∞'} — Colonie de Vacances 2026</p>
+          <p className="text-muted-foreground mt-1">
+            Nouvelle inscription — {settings.colonieNom}. La limite sur les rôles Titulaire et Suppléant N°1 est gérée
+            depuis l&apos;accueil (Mes enfants), selon les paramètres de la saison.
+          </p>
         )}
       </motion.div>
-
-      {!nonBiologiqueMode && MAX_ENFANTS !== null && (
-        <div className="flex gap-2">
-          {Array.from({ length: MAX_ENFANTS }).map((_, i) => (
-            <div key={i} className={`h-1.5 flex-1 rounded-full transition-colors ${i < nbInscrits ? 'bg-emerald-500' : i === nbInscrits ? 'bg-accent' : 'bg-muted'}`} />
-          ))}
-        </div>
-      )}
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="bg-card rounded-xl shadow-card border border-border overflow-hidden">
         {!nonBiologiqueMode && (
@@ -482,26 +450,6 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)} className="rounded-lg">Vérifier à nouveau</Button>
             <Button onClick={confirmInscription} className="rounded-lg bg-accent text-white hover:bg-accent/90">Confirmer l'inscription</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showMaxReachedPopup} onOpenChange={setShowMaxReachedPopup}>
-        <DialogContent className="sm:max-w-lg rounded-xl">
-          <DialogHeader>
-            <div className="flex flex-col items-center text-center gap-4 pt-4">
-              <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center"><PartyPopper className="w-10 h-10 text-emerald-600" /></div>
-              <DialogTitle className="text-xl text-foreground">🎉 Félicitations !</DialogTitle>
-            </div>
-            <DialogDescription className="text-center pt-4 text-base leading-relaxed">
-              Vous avez inscrit avec succès vos <strong className="text-foreground">{MAX_ENFANTS} enfants</strong> pour la Colonie de Vacances 2026.
-              <br /><br /><span className="text-foreground font-medium">Vos inscriptions sont désormais complètes.</span>
-              <br /><br />Vous pouvez suivre le statut de vos enfants dans la section <strong>"Mes enfants"</strong> et consulter toutes les inscriptions dans la section dédiée.
-              <br /><br /><span className="text-muted-foreground text-sm">Nous vous souhaitons de belles vacances en famille ! 🌴</span>
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="justify-center pt-2">
-            <Button onClick={() => setShowMaxReachedPopup(false)} className="rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 px-8">C'est compris !</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
