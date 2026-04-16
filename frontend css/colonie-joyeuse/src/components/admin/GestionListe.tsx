@@ -468,13 +468,11 @@ export default function GestionListe({ type }: Props) {
                           {type === 'attente_n2' && !!e.justificatifNomFichier && e.justificatifValide == null && (
                             <>
                               <Button size="sm" onClick={() => handleValiderJustificatif(e)} className="gap-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white h-7 px-2">
-                                <CheckCircle2 className="w-3 h-3" />Valider doc
+                                <CheckCircle2 className="w-3 h-3" />Valider
                               </Button>
-                              {/* Action "Refuser doc" masquée à la demande.
                               <Button size="sm" onClick={() => handleRefuserJustificatif(e)} className="gap-1 text-xs rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground h-7 px-2">
-                                <ThumbsDown className="w-3 h-3" />Refuser doc
+                                <ThumbsDown className="w-3 h-3" />Refus définitif
                               </Button>
-                              */}
                             </>
                           )}
                         </div>
