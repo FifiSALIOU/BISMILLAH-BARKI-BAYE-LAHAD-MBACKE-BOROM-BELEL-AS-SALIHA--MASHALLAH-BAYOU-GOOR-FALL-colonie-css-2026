@@ -415,15 +415,15 @@ export default function GestionListe({ type }: Props) {
                 <TableHead className="font-semibold">Âge</TableHead>
                 <TableHead className="font-semibold">Sexe</TableHead>
                 <TableHead className="font-semibold">Statut</TableHead>
-                {/* Colonne « Informations » masquée : pas d’approbation explicite, seul Refuser reste en Actions.
-                <TableHead className="font-semibold">Informations</TableHead>
-                */}
+                {type === 'attente_n2' && (
+                  <TableHead className="font-semibold">Informations</TableHead>
+                )}
                 <TableHead className="font-semibold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {enfantsOrdreArrivee.length === 0 ? (
-                <TableRow><TableCell colSpan={12} className="text-center py-12 text-muted-foreground">Aucun enfant dans cette liste</TableCell></TableRow>
+                <TableRow><TableCell colSpan={type === 'attente_n2' ? 13 : 12} className="text-center py-12 text-muted-foreground">Aucun enfant dans cette liste</TableCell></TableRow>
               ) : (
                 enfantsOrdreArrivee.map((e) => {
                   const p = { nom: e.parentNom, prenom: e.parentPrenom, service: e.parentService, email: e.parentEmail, telephone: e.parentTelephone };
@@ -458,13 +458,19 @@ export default function GestionListe({ type }: Props) {
                           {e.desistement === 'validé' && <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-destructive/10 text-destructive">Désisté</span>}
                         </div>
                       </TableCell>
-                      {/* Colonne « Informations » masquée (voir en-tête).
-                      <TableCell>
-                        {validation === 'validé' && <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700">✅ Approuvé</span>}
-                        {validation === 'refusé' && <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-destructive/10 text-destructive">❌ Refusé</span>}
-                        {validation === 'en_attente' && <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground">En attente</span>}
-                      </TableCell>
-                      */}
+                      {type === 'attente_n2' && (
+                        <TableCell>
+                          {validation === 'validé' && (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700">Approuvé</span>
+                          )}
+                          {validation === 'refusé' && (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-md bg-destructive/10 text-destructive">Refusé</span>
+                          )}
+                          {validation === 'en_attente' && (
+                            <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground">En attente</span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell>
                         <div className="flex flex-wrap items-center gap-2" onClick={(evt) => evt.stopPropagation()}>
                           {/*
