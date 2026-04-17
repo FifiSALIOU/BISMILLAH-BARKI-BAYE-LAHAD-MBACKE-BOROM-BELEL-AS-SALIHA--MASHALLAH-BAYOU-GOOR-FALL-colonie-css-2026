@@ -799,7 +799,11 @@ export default function ParentDashboard() {
                         )}
                       </>
                     )}
-                    {(enfant.statut === 'Titulaire' || (hasTitulaire && hasSuppleantN1 && enfant.statut === 'Suppléant N1')) && !enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
+                    {((
+                      enfant.statut === 'Titulaire' ||
+                      (hasTitulaire && hasSuppleantN1 && enfant.statut === 'Suppléant N1') ||
+                      (enfant.lienParente === 'Autre' && enfant.liste === 'attente_n2')
+                    ) && !enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi) && (
                       <Button variant="outline" size="sm" onClick={() => handleDesistement(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
                         <HandMetal className="w-3 h-3" />Désistement
                       </Button>
@@ -833,8 +837,9 @@ export default function ParentDashboard() {
                     </span>
                   </div>
                   */}
-                  {/* Afficher Rang/Liste seulement après choix parent (Titulaire + Suppléant N1). */}
-                  {(enfant.statut === 'Titulaire' || (hasTitulaire && hasSuppleantN1)) && (
+                  {/* Afficher Rang/Liste après choix parent ; et aussi pour enfant non biologique N2. */}
+                  {(enfant.statut === 'Titulaire' || (hasTitulaire && hasSuppleantN1) || (enfant.lienParente === 'Autre' && enfant.liste === 'attente_n2')) &&
+                    !(enfant.desistement && enfant.lienParente === 'Autre' && enfant.liste === 'attente_n2') && (
                     <div className="flex items-center gap-1.5">
                       <Hash className="w-3 h-3 text-muted-foreground" />
                       <span className="text-xs font-medium text-muted-foreground">
