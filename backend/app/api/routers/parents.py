@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from pathlib import Path
 from uuid import uuid4
-from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
@@ -116,29 +115,13 @@ def _save_justificatifs_files(uploads: list[UploadFile]) -> tuple[str, str, str 
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Veuillez joindre au moins un document justificatif.",
         )
+    if len(valid_uploads) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Veuillez joindre un seul document justificatif.",
+        )
 
-    if len(valid_uploads) == 1:
-        return _save_justificatif_file(valid_uploads[0])
-
-    _JUSTIFICATIFS_DIR.mkdir(parents=True, exist_ok=True)
-    zip_name = f"{uuid4().hex}_justificatifs.zip"
-    target = _JUSTIFICATIFS_DIR / zip_name
-    used_names: set[str] = set()
-
-    with ZipFile(target, mode="w", compression=ZIP_DEFLATED) as zf:
-        for idx, upload in enumerate(valid_uploads, start=1):
-            original = (upload.filename or f"document_{idx}").strip() or f"document_{idx}"
-            safe_name = original.replace("\\", "_").replace("/", "_")
-            candidate = safe_name
-            suffix = 1
-            while candidate in used_names:
-                suffix += 1
-                candidate = f"{Path(safe_name).stem}_{suffix}{Path(safe_name).suffix}"
-            used_names.add(candidate)
-            content = upload.file.read()
-            zf.writestr(candidate, content)
-
-    return (str(target), "justificatifs.zip", "application/zip", target.stat().st_size)
+    return _save_justificatif_file(valid_uploads[0])
 
 
 @router.post("/inscriptions", response_model=DemandeOut)
@@ -423,7 +406,7 @@ def list_inscriptions_transparence(
                 rang_dans_liste=d.rang_dans_liste,
                 date_inscription=when,
                 updated_at=_dt_aware_utc(d.updated_at),
-                is_reinscrit=(d.statut == DemandeStatut.SOUMISE and d.updated_at is not None),
+                is_reinscrit=(d.statut in (DemandeStatut.SOUMISE, DemandeStatut.RETENUE) and d.updated_at is not None),
                 statut_demande=d.statut.value,
                 parent_matricule=p.matricule,
                 parent_prenom=p.prenom,
@@ -642,7 +625,7 @@ def _to_demande_out(db: Session, demande: DemandeInscription) -> DemandeOut:
         non_validation_reason=demande.non_validation_reason or None,
         is_selection_finale=(demande.statut == DemandeStatut.RETENUE),
         has_desistement_pending=(demande.desistement is not None and demande.statut != DemandeStatut.DESISTEE),
-        is_reinscrit=(demande.statut == DemandeStatut.SOUMISE and demande.updated_at is not None),
+        is_reinscrit=(demande.statut in (DemandeStatut.SOUMISE, DemandeStatut.RETENUE) and demande.updated_at is not None),
         rejet_definitif=bool(
             demande.statut == DemandeStatut.NON_VALIDEE and getattr(demande, "rejet_definitif", False)
         ),

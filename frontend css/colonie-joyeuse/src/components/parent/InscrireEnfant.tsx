@@ -194,9 +194,14 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
 
     const listeLabel = liste === 'principale' ? 'Liste Principale (Titulaire)' : liste === 'attente_n1' ? "Liste d'Attente N°1 (Suppléant)" : "Liste d'Attente N°2";
 
-    setSuccessMessage(`${prenom} ${nom} a été inscrit(e) avec succès dans la ${listeLabel}.`);
+    const limitReachedMessage = "Vous avez atteint votre limite d'inscription (1 enfant non biologique autorisé).";
+    setSuccessMessage(
+      nonBiologiqueMode
+        ? `${prenom} ${nom} a été inscrit(e) avec succès dans la ${listeLabel}. ${limitReachedMessage}`
+        : `${prenom} ${nom} a été inscrit(e) avec succès dans la ${listeLabel}.`
+    );
     setSuccessOpen(true);
-    setShowNextPrompt(true);
+    setShowNextPrompt(!nonBiologiqueMode);
     resetForm();
   };
 
@@ -338,10 +343,12 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
                     ref={fileInputRef}
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
-                    multiple
                     required
                     aria-required="true"
-                    onChange={(e) => setJustificatifFiles(Array.from(e.target.files ?? []))}
+                    onChange={(e) => {
+                      const first = (e.target.files ?? [])[0];
+                      setJustificatifFiles(first ? [first] : []);
+                    }}
                     className="hidden"
                   />
                   <div className="flex items-center gap-3">
@@ -352,12 +359,12 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
                       className="rounded-lg h-10 px-4 gap-2"
                     >
                       <Upload className="w-4 h-4" />
-                      Choisir des fichiers
+                      Choisir un fichier
                     </Button>
                     <span className="text-xs text-muted-foreground">
                       {justificatifFiles.length === 0
                         ? 'Aucun fichier sélectionné'
-                        : `${justificatifFiles.length} fichier(s) sélectionné(s)`}
+                        : `${justificatifFiles.length} fichier sélectionné`}
                     </span>
                   </div>
                   {justificatifFiles.length > 0 && (

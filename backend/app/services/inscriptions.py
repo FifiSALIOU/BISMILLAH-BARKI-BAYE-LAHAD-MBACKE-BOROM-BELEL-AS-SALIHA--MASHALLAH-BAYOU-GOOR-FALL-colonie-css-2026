@@ -17,6 +17,9 @@ from app.services.users import (
     raise_if_parent_telephone_conflict,
 )
 
+_VALIDATION_INFOS_OK_MARKER = "__INFOS_VALIDEES_AVANT_DESISTEMENT__"
+
+
 def demande_compte_pour_rang_actif(d: DemandeInscription) -> bool:
     """Rangs visibles 1..n : SOUMISE et RETENUE. NON_VALIDEE et DESISTEE : queue (renumérotation inchangée : `*_sorted` puis refoulement)."""
     return d.statut in (DemandeStatut.SOUMISE, DemandeStatut.RETENUE)
@@ -542,6 +545,11 @@ def request_desistement(*, db: Session, user: User, demande_id: int, reason: str
     if demande.desistement is not None:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Désistement déjà demandé.")
 
+    # Le désistement ne doit pas faire perdre l'état "informations validées".
+    # On conserve ce signal de manière interne pour pouvoir le restaurer à la réinscription.
+    if demande.statut == DemandeStatut.RETENUE:
+        demande.non_validation_reason = _VALIDATION_INFOS_OK_MARKER
+
     demande.statut = DemandeStatut.DESISTEE
     demande.updated_at = datetime.now(timezone.utc)
     db.flush()
@@ -597,7 +605,10 @@ def reinscrire_desiste(*, db: Session, user: User, demande_id: int) -> DemandeIn
             detail="Réinscription impossible : un désistement est encore en cours de traitement.",
         )
 
-    demande.statut = DemandeStatut.SOUMISE
+    if demande.non_validation_reason == _VALIDATION_INFOS_OK_MARKER:
+        demande.statut = DemandeStatut.RETENUE
+    else:
+        demande.statut = DemandeStatut.SOUMISE
     demande.non_validation_reason = ""
     demande.updated_at = datetime.now(timezone.utc)
     db.flush()
