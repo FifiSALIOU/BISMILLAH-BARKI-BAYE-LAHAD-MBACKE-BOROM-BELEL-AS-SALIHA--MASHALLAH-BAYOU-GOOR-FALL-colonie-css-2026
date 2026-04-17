@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, text
@@ -28,7 +28,14 @@ from app.services.inscriptions import (
     _next_rang_for_liste,
 )
 from app.services.liste_finale_compute import demandes_liste_finale_retenus_si_cloturees, inscriptions_cloturees
+from app.schemas.inscriptions import EnfantCorrectionIn
 from app.services.enfants_import_superadmin import import_enfants_fichier_superadmin
+from app.services.enfants_superadmin import (
+    parent_ids_avec_demande_sur_liste,
+    superadmin_delete_enfant,
+    superadmin_patch_enfant,
+    superadmin_suppression_enfant_autorisee,
+)
 from app.services.liste_finale_lock import raise_if_liste_finale_definitive
 from app.services.notify_helpers import collect_admin_emails
 from app.services.runtime_settings_store import (
@@ -97,6 +104,37 @@ class SiteConfigIn(BaseModel):
 class ServiceConfigIn(BaseModel):
     nom: str = Field(min_length=1, max_length=255)
     description: str | None = None
+
+
+class EnfantChargeOut(BaseModel):
+    id: int
+    parent_id: int
+    parent_matricule: str
+    parent_prenom: str
+    parent_nom: str
+    prenom: str
+    nom: str
+    date_naissance: date
+    sexe: Sexe
+    lien_parente: LienParente
+    is_titulaire: bool
+    superadmin_suppression_autorisee: bool
+    created_at: datetime | None = None
+
+
+class EnfantsChargesParentRefOut(BaseModel):
+    id: int
+    matricule: str
+    prenom: str
+    nom: str
+
+
+class EnfantsChargesPageOut(BaseModel):
+    enfants: list[EnfantChargeOut]
+    filter_active: bool = False
+    parent_found: bool | None = None
+    parent: EnfantsChargesParentRefOut | None = None
+    filter_message: str | None = None
 
 
 def _default_runtime_settings() -> dict:
@@ -1278,3 +1316,151 @@ def import_enfants_parents_csv(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=out.get("error") or "Import impossible.")
     db.commit()
     return out
+
+
+def _enfant_charge_out(enfant: Enfant, parent: Parent, *, superadmin_suppression_autorisee: bool) -> EnfantChargeOut:
+    return EnfantChargeOut(
+        id=int(enfant.id),
+        parent_id=int(parent.id),
+        parent_matricule=parent.matricule,
+        parent_prenom=parent.prenom,
+        parent_nom=parent.nom,
+        prenom=enfant.prenom,
+        nom=enfant.nom,
+        date_naissance=enfant.date_naissance,
+        sexe=enfant.sexe,
+        lien_parente=enfant.lien_parente,
+        is_titulaire=bool(enfant.is_titulaire),
+        superadmin_suppression_autorisee=superadmin_suppression_autorisee,
+        created_at=enfant.created_at,
+    )
+
+
+def _rows_to_enfant_charge_out(db: Session, rows: list[tuple[Enfant, Parent]]) -> list[EnfantChargeOut]:
+    parent_ids = {int(p.id) for _, p in rows}
+    bloques = parent_ids_avec_demande_sur_liste(db, parent_ids)
+    return [
+        _enfant_charge_out(
+            enfant,
+            parent,
+            superadmin_suppression_autorisee=int(parent.id) not in bloques,
+        )
+        for enfant, parent in rows
+    ]
+
+
+@router.get("/parents/enfants", response_model=EnfantsChargesPageOut)
+def list_enfants_charges(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
+    matricule: str | None = Query(default=None, max_length=191),
+    parent_prenom: str | None = Query(default=None, max_length=191),
+    parent_nom: str | None = Query(default=None, max_length=191),
+):
+    _ = user
+    mat = (matricule or "").strip()
+    pp = (parent_prenom or "").strip()
+    pn = (parent_nom or "").strip()
+    has_mat = bool(mat)
+    has_name = bool(pp and pn)
+    has_partial_name = bool(pp or pn) and not has_name
+
+    if has_partial_name and not has_mat:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Pour filtrer par nom, renseignez le prénom et le nom ensemble, ou utilisez le matricule.",
+        )
+
+    if not has_mat and not has_name:
+        rows = (
+            db.query(Enfant, Parent)
+            .join(Parent, Parent.id == Enfant.parent_id)
+            .order_by(Enfant.created_at.desc().nullslast(), Enfant.id.desc())
+            .all()
+        )
+        return EnfantsChargesPageOut(enfants=_rows_to_enfant_charge_out(db, rows))
+
+    if has_mat:
+        parents = db.query(Parent).filter(func.lower(Parent.matricule) == mat.lower()).all()
+    else:
+        parents = (
+            db.query(Parent)
+            .filter(
+                func.lower(Parent.prenom) == pp.lower(),
+                func.lower(Parent.nom) == pn.lower(),
+            )
+            .all()
+        )
+
+    if len(parents) == 0:
+        return EnfantsChargesPageOut(
+            enfants=[],
+            filter_active=True,
+            parent_found=False,
+            filter_message="Aucun parent ne correspond à ce critère dans la base.",
+        )
+
+    if len(parents) > 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Plusieurs parents correspondent. Précisez le matricule.",
+        )
+
+    parent = parents[0]
+    rows = (
+        db.query(Enfant, Parent)
+        .join(Parent, Parent.id == Enfant.parent_id)
+        .filter(Parent.id == parent.id)
+        .order_by(Enfant.created_at.desc().nullslast(), Enfant.id.desc())
+        .all()
+    )
+    pref = EnfantsChargesParentRefOut(
+        id=int(parent.id),
+        matricule=parent.matricule,
+        prenom=parent.prenom,
+        nom=parent.nom,
+    )
+    if not rows:
+        return EnfantsChargesPageOut(
+            enfants=[],
+            filter_active=True,
+            parent_found=True,
+            parent=pref,
+            filter_message="Ce parent est enregistré en base mais n’a aucun enfant chargé.",
+        )
+    return EnfantsChargesPageOut(
+        enfants=_rows_to_enfant_charge_out(db, rows),
+        filter_active=True,
+        parent_found=True,
+        parent=pref,
+    )
+
+
+@router.patch("/parents/enfants/{enfant_id}", response_model=EnfantChargeOut)
+def patch_enfant_superadmin(
+    enfant_id: int,
+    payload: EnfantCorrectionIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
+):
+    _ = user
+    enfant, parent = superadmin_patch_enfant(db, enfant_id=enfant_id, payload=payload)
+    db.commit()
+    db.refresh(enfant)
+    return _enfant_charge_out(
+        enfant,
+        parent,
+        superadmin_suppression_autorisee=superadmin_suppression_enfant_autorisee(db, parent_id=int(parent.id)),
+    )
+
+
+@router.delete("/parents/enfants/{enfant_id}")
+def delete_enfant_superadmin(
+    enfant_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
+):
+    _ = user
+    superadmin_delete_enfant(db, enfant_id=enfant_id)
+    db.commit()
+    return {"ok": True}

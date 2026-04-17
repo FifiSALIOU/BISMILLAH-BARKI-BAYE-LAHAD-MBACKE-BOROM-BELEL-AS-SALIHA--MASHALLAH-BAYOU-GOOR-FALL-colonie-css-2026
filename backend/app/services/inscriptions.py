@@ -507,9 +507,26 @@ def set_suppleant_n1(*, db: Session, user: User, enfant_id_suppleant: int) -> No
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Un enfant 'Autre' ne peut pas être en N1.")
 
     ensure_listes_exist(db)
+    liste_p = db.query(Liste).filter(Liste.code == ListeCode.PRINCIPALE).first()
     liste_n1 = db.query(Liste).filter(Liste.code == ListeCode.ATTENTE_N1).first()
-    if liste_n1 is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste N1 introuvable.")
+    if liste_p is None or liste_n1 is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste introuvable.")
+
+    a_titulaire_sur_principale = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(
+            Enfant.parent_id == parent.id,
+            DemandeInscription.liste_id == liste_p.id,
+            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE)),
+        )
+        .first()
+    )
+    if a_titulaire_sur_principale is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Définissez d'abord l'enfant titulaire avant le suppléant N°1.",
+        )
 
     old_liste_id = int(demande.liste_id) if demande.liste_id is not None else None
     demande.liste_id = int(liste_n1.id)
@@ -586,7 +603,7 @@ def set_suppleant_n2(*, db: Session, user: User, enfant_id_suppleant: int) -> No
     if not has_p or not has_n1:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Définissez d'abord le titulaire et le suppléant N°1.",
+            detail="Définissez d'abord le titulaire puis le suppléant N°1 avant le suppléant N°2.",
         )
 
     autre_n2_bio = (

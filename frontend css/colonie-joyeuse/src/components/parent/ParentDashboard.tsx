@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { flushSync } from 'react-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInscription } from '@/contexts/InscriptionContext';
@@ -52,18 +53,30 @@ export default function ParentDashboard() {
   const [listeFinaleApiPubliee, setListeFinaleApiPubliee] = useState(false);
   /** Après validation définitive par le gestionnaire : actions de désistement / titulaire bloquées côté API. */
   const [listeFinaleDefinitiveApi, setListeFinaleDefinitiveApi] = useState(false);
+  /** True seulement après succès de `/parent/demandes` + transparence (jamais sur erreur réseau/API — évite le bandeau « pas d'enfant » puis disparition). */
+  const [demandesParentChargees, setDemandesParentChargees] = useState(false);
+  const chargementDemandesSeqRef = useRef(0);
 
   const loadAll = useCallback(async () => {
-    if (!token || !parent) return;
+    const matricule = parent?.matricule;
+    if (!token || !matricule) return;
+    const seq = ++chargementDemandesSeqRef.current;
     try {
       const [demandes, trans] = await Promise.all([
         apiRequest<DemandeOutApi[]>('/parent/demandes', { token }),
         apiRequest<TransparenceRowApi[]>('/parent/inscriptions-transparence', { token }),
       ]);
+      if (seq !== chargementDemandesSeqRef.current) return;
+
       const rows = trans || [];
-      setMesEnfants((demandes || []).map((d) => mapDemandeOutToEnfant(d, parent.matricule)));
-      setTransparenceEnfants(rows.map(mapTransparenceRowToEnfant));
-      setTransparenceParents(parentsFromTransparence(rows));
+      const mapped = (demandes || []).map((d) => mapDemandeOutToEnfant(d, matricule));
+      /* Un seul commit : évite un rendu intermédiaire « prêt + liste vide ». */
+      flushSync(() => {
+        setMesEnfants(mapped);
+        setTransparenceEnfants(rows.map(mapTransparenceRowToEnfant));
+        setTransparenceParents(parentsFromTransparence(rows));
+        setDemandesParentChargees(true);
+      });
 
       try {
         const finaleRes = await apiRequest<{
@@ -71,12 +84,14 @@ export default function ParentDashboard() {
           retenus: ListeFinaleRowApi[];
           liste_finale_definitive?: boolean;
         }>('/parent/liste-finale', { token });
+        if (seq !== chargementDemandesSeqRef.current) return;
         const fin = finaleRes?.retenus ?? [];
         setListeFinaleApiPubliee(!!finaleRes?.disponible);
         setListeFinaleDefinitiveApi(!!finaleRes?.liste_finale_definitive);
         setListeFinaleApiEnfants(fin.map(mapListeFinaleRowToEnfant));
         setListeFinaleApiParents(parentsFromListeFinale(fin));
       } catch {
+        if (seq !== chargementDemandesSeqRef.current) return;
         setListeFinaleApiPubliee(false);
         setListeFinaleDefinitiveApi(false);
         setListeFinaleApiEnfants([]);
@@ -84,8 +99,27 @@ export default function ParentDashboard() {
       }
     } catch (e) {
       console.error(e);
+      if (seq !== chargementDemandesSeqRef.current) return;
+      /* Ne pas passer demandesParentChargees à true ici : sinon bandeau « pas d'enfant codifié » si une requête échoue puis la suivante réussit. */
+      toast({
+        title: 'Chargement incomplet',
+        description: e instanceof Error ? e.message : 'Impossible de charger vos inscriptions. Réessayez dans un instant.',
+        variant: 'destructive',
+      });
     }
-  }, [token, parent]);
+  }, [token, parent?.matricule]);
+
+  useEffect(() => {
+    chargementDemandesSeqRef.current += 1;
+    setMesEnfants([]);
+    setTransparenceEnfants([]);
+    setTransparenceParents([]);
+    setListeFinaleApiPubliee(false);
+    setListeFinaleDefinitiveApi(false);
+    setListeFinaleApiEnfants([]);
+    setListeFinaleApiParents([]);
+    setDemandesParentChargees(false);
+  }, [parent?.matricule, token]);
 
   useEffect(() => {
     void loadAll();
@@ -120,6 +154,8 @@ export default function ParentDashboard() {
   const [searchTerm, setSearchTerm] = useState('');
   const [phoneInput, setPhoneInput] = useState('');
   const [phoneSaving, setPhoneSaving] = useState(false);
+  const [ordreRolesDialogOpen, setOrdreRolesDialogOpen] = useState(false);
+  const [ordreRolesDialogText, setOrdreRolesDialogText] = useState('');
 
   useEffect(() => {
     if (!listeFinaleApiPubliee && activeTab === 'liste_finale') {
@@ -384,6 +420,13 @@ export default function ParentDashboard() {
   };
 
   const setAsSuppleantN1 = async (id: string) => {
+    if (!hasTitulaire) {
+      setOrdreRolesDialogText(
+        'Vous devez d’abord désigner l’enfant titulaire avant de placer un suppléant N°1.',
+      );
+      setOrdreRolesDialogOpen(true);
+      return;
+    }
     const current = enfants.find((e) => e.id === id);
     const demandeId = getDemandeIdForAction(current);
     if (!current || !token) return;
@@ -402,6 +445,14 @@ export default function ParentDashboard() {
   };
 
   const setAsSuppleantN2 = async (id: string) => {
+    if (!hasTitulaire || !hasSuppleantN1) {
+      setOrdreRolesDialogText(
+        'L’ordre à respecter est : d’abord le titulaire, ensuite le suppléant N°1, puis le suppléant N°2. Définissez les rôles précédents avant le suppléant N°2. ' +
+          'Le bouton suppléant N°2 n’apparaît que si l’administration autorise trois enfants par parent (section Paramètres).',
+      );
+      setOrdreRolesDialogOpen(true);
+      return;
+    }
     const current = enfants.find((e) => e.id === id);
     const demandeId = getDemandeIdForAction(current);
     if (!current || !token) return;
@@ -419,10 +470,7 @@ export default function ParentDashboard() {
     }
   };
 
-  /** Masquer « Suppléant N1 » sur l’enfant encore sans liste quand P+N1 sont pris et plafond ≥ 3 (emplacement réservé au bouton N2). */
-  const afficherBoutonSuppleantN1PourCarte = (e: Enfant) =>
-    e.statut !== 'Suppléant N1' &&
-    !(MAX != null && MAX >= 3 && hasTitulaire && hasSuppleantN1 && e.sansAttributionListe === true);
+  const afficherBoutonSuppleantN1PourCarte = (e: Enfant) => e.statut !== 'Suppléant N1';
 
   const handleEditDemande = (enfant: Enfant) => {
     const lienApi = LIEN_PARENTE_FR_TO_API[enfant.lienParente] || 'AUTRE';
@@ -521,10 +569,10 @@ export default function ParentDashboard() {
     return null;
   };
 
-  // Card click -> open corresponding tab and highlight
+  // Card click -> open corresponding tab and highlight (enfants déjà sur une liste dans les tableaux transparence)
   const handleCardClick = (enfant: typeof enfants[0]) => {
-    const tabKey = isNonInscrit(enfant) ? 'principale' : getListeTabKey(enfant.liste);
-    setActiveTab(tabKey);
+    if (isNonInscrit(enfant)) return;
+    setActiveTab(getListeTabKey(enfant.liste));
     setHighlightedEnfantId(enfant.id);
     setTimeout(() => setHighlightedEnfantId(null), 3000);
   };
@@ -768,7 +816,7 @@ export default function ParentDashboard() {
       {/* Vos inscriptions - Cards with actions */}
       <div className="space-y-4">
         {enfantsMesEligibles.length > 0 && <h2 className="text-lg font-semibold text-foreground">Mes enfants</h2>}
-        {noEnfantCharge && (
+        {demandesParentChargees && noEnfantCharge && (
           <div className="max-w-4xl space-y-4">
             <div className="rounded-xl border border-amber-300/90 bg-amber-50/40 p-5">
               <div className="flex items-start gap-3">
@@ -809,9 +857,9 @@ export default function ParentDashboard() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 + 0.1 * i }}
-              className={`w-full rounded-xl border border-border bg-card cursor-pointer hover:shadow-md transition-shadow shadow-card ${
-                actionsTitulaireN1BloqueesPourCarte(enfant) ? 'opacity-60 border-dashed' : ''
-              }`}
+              className={`w-full rounded-xl border border-border bg-card transition-shadow shadow-card ${
+                isNonInscrit(enfant) ? 'cursor-default' : 'cursor-pointer hover:shadow-md'
+              } ${actionsTitulaireN1BloqueesPourCarte(enfant) ? 'opacity-60 border-dashed' : ''}`}
               onClick={() => handleCardClick(enfant)}
             >
               <div className="p-4 space-y-2">
@@ -862,11 +910,7 @@ export default function ParentDashboard() {
                             Suppléant N1
                           </Button>
                         )}
-                        {MAX != null &&
-                          MAX >= 3 &&
-                          hasTitulaire &&
-                          hasSuppleantN1 &&
-                          enfant.sansAttributionListe === true && (
+                        {MAX != null && MAX >= 3 && enfant.sansAttributionListe === true && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -992,7 +1036,8 @@ export default function ParentDashboard() {
         )}
       </div>
 
-      {/* Tabs: Listes + Liste finale */}
+      {/* Tabs : affichés seulement après chargement demandes + transparence (évite flash titre / encart). */}
+      {demandesParentChargees && (
       <div ref={tabsRef} className="space-y-4">
         <h2 className="text-lg font-semibold text-foreground">Toutes les inscriptions</h2>
         <div className="bg-accent/5 border border-accent/20 rounded-lg p-3">
@@ -1025,6 +1070,7 @@ export default function ParentDashboard() {
           )}
         </Tabs>
       </div>
+      )}
 
       {/* Inscription Dialog */}
       <Dialog open={inscrireOpen} onOpenChange={setInscrireOpen}>
@@ -1152,6 +1198,28 @@ export default function ParentDashboard() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter><Button onClick={() => setCancelDesistError(false)} className="bg-primary text-primary-foreground rounded-lg">Compris</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Ordre des rôles (titulaire → N1 → N2) */}
+      <Dialog open={ordreRolesDialogOpen} onOpenChange={setOrdreRolesDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-xl">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 shrink-0 rounded-xl bg-amber-100 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <DialogTitle className="text-foreground">Ordre des rôles</DialogTitle>
+            </div>
+            <DialogDescription className="pt-2 text-sm text-muted-foreground whitespace-pre-wrap">
+              {ordreRolesDialogText}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setOrdreRolesDialogOpen(false)} className="rounded-lg bg-primary text-primary-foreground">
+              Compris
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
