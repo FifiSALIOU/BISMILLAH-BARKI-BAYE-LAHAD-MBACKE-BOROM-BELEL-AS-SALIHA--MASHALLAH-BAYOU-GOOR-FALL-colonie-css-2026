@@ -571,7 +571,21 @@ export default function ParentDashboard() {
   const noEnfantCharge = enfants.length === 0;
   /** Parent sans enfant codifié côté RH : liste vide ou uniquement des inscriptions « Autre » (non biologique). */
   const parentQueDesNonBio = enfants.every((e) => e.lienParente === 'Autre');
-  const afficherInscriptionNonBio = !inscriptionsCloturees && parentQueDesNonBio;
+  const nonBioInscriptionsCount = enfants.filter((e) => e.lienParente === 'Autre').length;
+  const nonBioUniqueLimitReached = parentQueDesNonBio && nonBioInscriptionsCount >= 1;
+  const afficherInscriptionNonBio = !inscriptionsCloturees && parentQueDesNonBio && !nonBioUniqueLimitReached;
+
+  const prevNonBioCountRef = useRef(nonBioInscriptionsCount);
+  useEffect(() => {
+    const prev = prevNonBioCountRef.current;
+    if (parentQueDesNonBio && prev === 0 && nonBioInscriptionsCount >= 1) {
+      toast({
+        title: 'Limite atteinte',
+        description: 'Vous avez atteint votre unique inscription autorisée pour un enfant non biologique.',
+      });
+    }
+    prevNonBioCountRef.current = nonBioInscriptionsCount;
+  }, [parentQueDesNonBio, nonBioInscriptionsCount]);
 
   if (!hasRequiredPhone) {
     return (
@@ -879,6 +893,14 @@ export default function ParentDashboard() {
               Inscrire un autre enfant (non biologique)
             </Button>
           </div>
+        )}
+        {nonBioUniqueLimitReached && (
+          <Alert className="max-w-4xl border-amber-200 bg-amber-50/60">
+            {/* <AlertTitle>Inscription non biologique limitée</AlertTitle> */}
+            <AlertDescription>
+              Vous avez déjà utilisé votre unique inscription autorisée pour un enfant non biologique.
+            </AlertDescription>
+          </Alert>
         )}
       </div>
 

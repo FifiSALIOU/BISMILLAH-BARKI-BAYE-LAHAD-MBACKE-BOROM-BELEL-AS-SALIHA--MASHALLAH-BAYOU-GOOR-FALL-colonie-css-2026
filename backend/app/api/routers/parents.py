@@ -7,6 +7,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
+from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
 
@@ -227,6 +228,22 @@ def creer_inscription_non_biologique_n2(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Cette action est réservée aux parents sans enfant préchargé (biologique).",
+        )
+
+    # Règle métier spécifique N2 non biologique :
+    # un parent sans enfant codifié ne peut faire qu'une seule inscription non biologique.
+    nb_non_bio_deja_inscrits = (
+        db.query(func.count(func.distinct(Enfant.id)))
+        .select_from(Enfant)
+        .join(DemandeInscription, DemandeInscription.enfant_id == Enfant.id)
+        .filter(Enfant.parent_id == parent.id, Enfant.lien_parente == LienParente.AUTRE)
+        .scalar()
+        or 0
+    )
+    if nb_non_bio_deja_inscrits >= 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vous avez déjà effectué votre unique inscription autorisée pour un enfant non biologique.",
         )
 
     if enfant_sexe not in ("M", "F"):

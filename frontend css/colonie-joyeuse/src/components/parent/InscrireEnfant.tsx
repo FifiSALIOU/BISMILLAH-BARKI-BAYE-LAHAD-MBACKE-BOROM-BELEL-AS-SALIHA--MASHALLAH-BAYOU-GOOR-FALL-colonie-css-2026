@@ -456,6 +456,10 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
 
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="sm:max-w-3xl rounded-xl p-0 overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Aperçu du fichier justificatif</DialogTitle>
+            <DialogDescription>{previewName || 'Aperçu du document sélectionné'}</DialogDescription>
+          </DialogHeader>
           <div className="relative bg-card">
             <button
               type="button"
