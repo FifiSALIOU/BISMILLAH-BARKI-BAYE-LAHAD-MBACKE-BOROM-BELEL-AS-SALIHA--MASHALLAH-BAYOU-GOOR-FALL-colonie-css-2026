@@ -50,6 +50,7 @@ class UserUpsertIn(BaseModel):
     is_active: Optional[bool] = None
     email: Optional[EmailStr] = None
     role: Optional[UserRole] = None
+    matricule: Optional[str] = Field(default=None, min_length=1, max_length=50)
     parent_prenom: Optional[str] = Field(default=None, min_length=1, max_length=255)
     parent_nom: Optional[str] = Field(default=None, min_length=1, max_length=255)
     parent_service: Optional[str] = Field(default=None, min_length=1, max_length=255)

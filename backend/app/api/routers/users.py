@@ -6,12 +6,12 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import ValidationError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.enums import UserRole
-from app.models.models import User
+from app.models.models import Parent, User
 from app.schemas.users import (
     AdminUserCreateIn,
     ParentUserCreateIn,
@@ -109,8 +109,13 @@ def _send_admin_password_reset_email(contact: str, temp_password: str) -> None:
 def build_user_out(u: User) -> UserOut:
     email = _admin_contact_email(u)
     parent_prenom = parent_nom = parent_service = parent_site_code = parent_telephone = None
+    matricule_out = u.matricule
     if u.role == UserRole.PARENT and u.parent_profile:
         pp = u.parent_profile
+        # Aligné fiche RH : le matricule affiché pour les parents suit `parents.matricule` (connexion = `users.matricule`).
+        m = (pp.matricule or "").strip()
+        if m:
+            matricule_out = m
         parent_prenom = pp.prenom
         parent_nom = pp.nom
         parent_service = pp.service_text
@@ -123,7 +128,7 @@ def build_user_out(u: User) -> UserOut:
         role=u.role,
         is_active=u.is_active,
         email=email,
-        matricule=u.matricule,
+        matricule=matricule_out,
         parent_prenom=parent_prenom,
         parent_nom=parent_nom,
         parent_service=parent_service,
@@ -138,7 +143,12 @@ def list_users(
     admin: User = Depends(require_roles(UserRole.SUPER_ADMIN)),
 ):
     _ = db, admin
-    users = db.query(User).order_by(User.id.asc()).all()
+    users = (
+        db.query(User)
+        .options(joinedload(User.parent_profile).joinedload(Parent.site_obj))
+        .order_by(User.id.asc())
+        .all()
+    )
     return [build_user_out(u) for u in users]
 
 
@@ -224,6 +234,7 @@ def upsert_user(
         is_active=payload.is_active,
         email=payload.email,
         role=payload.role,
+        matricule=payload.matricule,
         parent_prenom=payload.parent_prenom,
         parent_nom=payload.parent_nom,
         parent_service=payload.parent_service,

@@ -298,6 +298,7 @@ def update_user(
     is_active: Optional[bool],
     email: Optional[str],
     role: Optional[UserRole],
+    matricule: Optional[str] = None,
     parent_prenom: Optional[str] = None,
     parent_nom: Optional[str] = None,
     parent_service: Optional[str] = None,
@@ -322,6 +323,25 @@ def update_user(
 
     if user.role == UserRole.PARENT and user.parent_profile is not None:
         parent = user.parent_profile
+        if matricule is not None:
+            mat_norm = matricule.strip()
+            if not mat_norm:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Matricule parent invalide.")
+            taken = (
+                db.query(User)
+                .filter(
+                    func.lower(User.matricule) == mat_norm.lower(),
+                    User.id != user.id,
+                )
+                .first()
+            )
+            if taken:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Un compte existe déjà avec ce matricule.",
+                )
+            user.matricule = mat_norm
+            parent.matricule = mat_norm
         if parent_prenom is not None:
             parent.prenom = parent_prenom
         if parent_nom is not None:

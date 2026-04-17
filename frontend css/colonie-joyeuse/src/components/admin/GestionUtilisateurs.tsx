@@ -46,7 +46,7 @@ export default function GestionUtilisateurs() {
 
   // Edit parent
   const [editParentOpen, setEditParentOpen] = useState(false);
-  const [editingParent, setEditingParent] = useState<Parent | null>(null);
+  const [editingParent, setEditingParent] = useState<ParentRow | null>(null);
 
   // Reset password
   const [resetPwdOpen, setResetPwdOpen] = useState(false);
@@ -345,25 +345,34 @@ export default function GestionUtilisateurs() {
 
   const handleEditParent = async () => {
     if (!editingParent) return;
-    const target = parents.find((p) => p.matricule === editingParent.matricule);
-    if (!target) return;
-    await apiRequest(`/admin/users/${target.userId}`, {
-      method: 'PATCH',
-      token,
-      body: JSON.stringify({
-        name: `${editingParent.prenom} ${editingParent.nom}`.trim(),
-        service: editingParent.service,
-        parent_prenom: editingParent.prenom,
-        parent_nom: editingParent.nom,
-        parent_service: editingParent.service,
-        parent_site_code: editingParent.site || null,
-        email: editingParent.email || null,
-        parent_telephone: editingParent.telephone || null,
-      }),
-    });
-    await refreshUsers();
-    setEditParentOpen(false);
-    toast({ title: '✅ Parent modifié' });
+    const mat = editingParent.matricule.trim();
+    if (!mat) {
+      toast({ title: 'Matricule requis', variant: 'destructive' });
+      return;
+    }
+    try {
+      await apiRequest(`/admin/users/${editingParent.userId}`, {
+        method: 'PATCH',
+        token,
+        body: JSON.stringify({
+          name: `${editingParent.prenom} ${editingParent.nom}`.trim(),
+          matricule: mat,
+          parent_prenom: editingParent.prenom,
+          parent_nom: editingParent.nom,
+          parent_service: editingParent.service,
+          parent_site_code: editingParent.site || null,
+          email: editingParent.email || null,
+          parent_telephone: editingParent.telephone || null,
+        }),
+      });
+      await refreshUsers();
+      setEditParentOpen(false);
+      setEditingParent(null);
+      toast({ title: 'Parent modifié' });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Une erreur est survenue.';
+      toast({ title: 'Enregistrement impossible', description: msg, variant: 'destructive' });
+    }
   };
 
   const handleCSVUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -678,7 +687,18 @@ export default function GestionUtilisateurs() {
           <DialogHeader><DialogTitle>Modifier le parent</DialogTitle></DialogHeader>
           {editingParent && (
             <div className="space-y-4">
-              <div className="space-y-2"><Label>Matricule</Label><Input value={editingParent.matricule} disabled className="rounded-lg bg-muted/50" /></div>
+              <div className="space-y-2">
+                <Label>Matricule</Label>
+                <Input
+                  value={editingParent.matricule}
+                  onChange={(e) => setEditingParent({ ...editingParent, matricule: e.target.value })}
+                  className="rounded-lg font-mono tabular-nums"
+                  placeholder="Identifiant de connexion parent"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Même valeur en base sur le compte utilisateur et le profil parent : c&apos;est ce matricule qui sert à la connexion.
+                </p>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>Prénom</Label><Input value={editingParent.prenom} onChange={e => setEditingParent({ ...editingParent, prenom: e.target.value })} className="rounded-lg" /></div>
                 <div className="space-y-2"><Label>Nom</Label><Input value={editingParent.nom} onChange={e => setEditingParent({ ...editingParent, nom: e.target.value })} className="rounded-lg" /></div>

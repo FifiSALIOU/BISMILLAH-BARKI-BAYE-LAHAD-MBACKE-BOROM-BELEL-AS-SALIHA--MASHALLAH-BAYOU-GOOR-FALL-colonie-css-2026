@@ -47,7 +47,8 @@ def _resolve_admin_login_user(db: Session, login: str) -> User | None:
 
 @router.post("/login-parent", response_model=TokenResponse)
 def login_parent(payload: ParentLoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
-    user = db.query(User).filter(User.matricule == payload.matricule).first()
+    mat = payload.matricule.strip()
+    user = db.query(User).filter(func.lower(User.matricule) == mat.lower()).first()
     if not user or user.role != UserRole.PARENT or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Matricule ou mot de passe incorrect.")
     if not verify_password(payload.password, user.password):
