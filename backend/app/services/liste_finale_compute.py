@@ -56,11 +56,10 @@ def demandes_liste_finale_retenus_si_cloturees(db: Session) -> list[DemandeInscr
     )
 
     def _order(d: DemandeInscription) -> tuple[int, int, int]:
-        return (
-            _LISTE_ORDRE.get(d.liste.code, 99),
-            d.rang_dans_liste,
-            d.id,
+        ord_liste = (
+            _LISTE_ORDRE.get(d.liste.code, 99) if d.liste is not None else 99
         )
+        return (ord_liste, d.rang_dans_liste or 0, d.id)
 
     ordered = sorted(demandes, key=_order)
     if capacite_max is not None:

@@ -100,6 +100,22 @@ export default function GestionUtilisateurs() {
     setParents(mappedParents);
   };
 
+  const handleDeleteParent = async (userId: string) => {
+    if (!token) return;
+    try {
+      await apiRequest(`/admin/users/${userId}`, { method: 'DELETE', token });
+      await refreshUsers();
+      toast({ title: 'Parent supprimé', variant: 'destructive' });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Suppression impossible.';
+      toast({
+        title: 'Suppression impossible',
+        description: msg,
+        variant: 'destructive',
+      });
+    }
+  };
+
   const refreshSites = async () => {
     if (!token) return;
     const rows = await apiRequest<any[]>('/admin/sites', { token });
@@ -524,7 +540,7 @@ export default function GestionUtilisateurs() {
                       <div className="flex gap-1">
                         <Button size="sm" variant="ghost" onClick={() => { setEditingParent({ ...p }); setEditParentOpen(true); }} className="h-8 w-8 p-0"><Pencil className="w-3 h-3" /></Button>
                         <Button size="sm" variant="ghost" onClick={() => { setResetPwdTarget({ type: 'parent', id: p.matricule, name: `${p.prenom} ${p.nom}` }); setResetPwdOpen(true); }} className="h-8 w-8 p-0"><KeyRound className="w-3 h-3" /></Button>
-                        <Button size="sm" variant="ghost" onClick={async () => { await apiRequest(`/admin/users/${p.userId}`, { method: 'DELETE', token }); await refreshUsers(); toast({ title: '🗑️ Parent supprimé', variant: 'destructive' }); }} className="h-8 w-8 p-0 text-destructive hover:text-destructive"><Trash2 className="w-3 h-3" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => void handleDeleteParent(p.userId)} className="h-8 w-8 p-0 text-destructive hover:text-destructive"><Trash2 className="w-3 h-3" /></Button>
                       </div>
                     </TableCell>
                   </TableRow>

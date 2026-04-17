@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.models.enums import DemandeStatut, LienParente, ListeCode, Sexe
 from app.models.models import DemandeInscription, Enfant, Liste, Parent, Service, User
 from app.services.liste_finale_lock import raise_if_liste_finale_definitive
-from app.services.runtime_settings_store import merged_runtime_settings
+from app.services.runtime_settings_store import get_max_enfants_par_parent, merged_runtime_settings
 from app.services.users import (
     _get_or_create_site,
     normalize_parent_nin_for_storage,
@@ -517,6 +517,99 @@ def set_suppleant_n1(*, db: Session, user: User, enfant_id_suppleant: int) -> No
     enfant.is_titulaire = False
     if old_liste_id is not None and old_liste_id != int(liste_n1.id):
         _next_rang_for_liste(db, old_liste_id)
+
+
+def set_suppleant_n2(*, db: Session, user: User, enfant_id_suppleant: int) -> None:
+    """Affecte une demande sans liste à ATTENTE_N2 (troisième enfant biologique) — mêmes patterns que `set_suppleant_n1` (rang via `_next_rang_for_liste`)."""
+    raise_if_liste_finale_definitive()
+    parent = db.query(Parent).filter(Parent.user_id == user.id).first()
+    if not parent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent introuvable.")
+
+    max_ep = get_max_enfants_par_parent(default=2)
+    if max_ep < 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Paramètre « max enfants par parent » doit être au moins 3 pour positionner un suppléant N°2.",
+        )
+
+    demande = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(DemandeInscription.id == enfant_id_suppleant, Enfant.parent_id == parent.id)
+        .first()
+    )
+    if not demande:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande introuvable.")
+    _require_not_rejet_definitif(demande)
+
+    enfant = demande.enfant
+    if enfant.lien_parente == LienParente.AUTRE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Un enfant « Autre » doit être inscrit via le parcours liste N°2 dédié.",
+        )
+
+    if demande.liste_id is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cette demande a déjà une liste attribuée.",
+        )
+
+    ensure_listes_exist(db)
+    liste_p = db.query(Liste).filter(Liste.code == ListeCode.PRINCIPALE).first()
+    liste_n1 = db.query(Liste).filter(Liste.code == ListeCode.ATTENTE_N1).first()
+    liste_n2 = db.query(Liste).filter(Liste.code == ListeCode.ATTENTE_N2).first()
+    if liste_p is None or liste_n1 is None or liste_n2 is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste introuvable.")
+
+    has_p = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(
+            Enfant.parent_id == parent.id,
+            DemandeInscription.liste_id == liste_p.id,
+            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE)),
+        )
+        .first()
+    )
+    has_n1 = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(
+            Enfant.parent_id == parent.id,
+            DemandeInscription.liste_id == liste_n1.id,
+            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE)),
+        )
+        .first()
+    )
+    if not has_p or not has_n1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Définissez d'abord le titulaire et le suppléant N°1.",
+        )
+
+    autre_n2_bio = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(
+            Enfant.parent_id == parent.id,
+            DemandeInscription.liste_id == liste_n2.id,
+            Enfant.lien_parente != LienParente.AUTRE,
+            DemandeInscription.id != demande.id,
+            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE)),
+        )
+        .first()
+    )
+    if autre_n2_bio:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Un suppléant N°2 biologique est déjà positionné pour ce parent.",
+        )
+
+    demande.liste_id = int(liste_n2.id)
+    demande.rang_dans_liste = _next_rang_for_liste(db, int(liste_n2.id))
+    enfant.is_titulaire = False
 
 
 def request_desistement(*, db: Session, user: User, demande_id: int, reason: str | None) -> None:

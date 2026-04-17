@@ -140,10 +140,46 @@ export default function ParentDashboard() {
     });
   }, [mesEnfants, settings.ageMin, settings.ageMax]);
 
+  /** Places « P + N1 + N2 biologique » occupées : aligné sur le plafond MAX (2 ou 3) sans autre changement métier. */
   const placesListesParentSaison = useMemo(() => {
     const occupeTitulaire = enfantsMesEligibles.some((e) => e.statut === 'Titulaire' && !e.desistement);
     const occupeN1 = enfantsMesEligibles.some((e) => e.liste === 'attente_n1' && !e.desistement);
-    return (occupeTitulaire ? 1 : 0) + (occupeN1 ? 1 : 0);
+    const nonInscritPourCompte = (e: Enfant) =>
+      (e.sansAttributionListe === true && e.lienParente !== 'Autre' && e.statut !== 'Titulaire') ||
+      (e.rangListe == null &&
+        e.liste === 'attente_n2' &&
+        e.lienParente !== 'Autre' &&
+        e.statut !== 'Titulaire');
+    const bioN2Inscrit = (e: Enfant) =>
+      e.lienParente !== 'Autre' && e.liste === 'attente_n2' && !nonInscritPourCompte(e);
+    const occupeN2Bio = enfantsMesEligibles.some((e) => bioN2Inscrit(e) && !e.desistement);
+    return (occupeTitulaire ? 1 : 0) + (occupeN1 ? 1 : 0) + (occupeN2Bio ? 1 : 0);
+  }, [enfantsMesEligibles]);
+
+  /** Ordre des cartes « Mes enfants » uniquement : Titulaire → N1 → N2 biologique inscrit → le reste (affichage seul). */
+  const enfantsMesEligiblesOrdreAffichage = useMemo(() => {
+    const nonInscritPourTri = (e: Enfant) =>
+      (e.sansAttributionListe === true && e.lienParente !== 'Autre' && e.statut !== 'Titulaire') ||
+      (e.rangListe == null &&
+        e.liste === 'attente_n2' &&
+        e.lienParente !== 'Autre' &&
+        e.statut !== 'Titulaire');
+    const bioN2Inscrit = (e: Enfant) =>
+      e.lienParente !== 'Autre' && e.liste === 'attente_n2' && !nonInscritPourTri(e);
+    const rank = (e: Enfant): number => {
+      if (e.statut === 'Titulaire') return 0;
+      if (e.statut === 'Suppléant N1') return 1;
+      if (bioN2Inscrit(e)) return 2;
+      return 3;
+    };
+    return [...enfantsMesEligibles]
+      .map((e, i) => ({ e, i }))
+      .sort((a, b) => {
+        const d = rank(a.e) - rank(b.e);
+        if (d !== 0) return d;
+        return a.i - b.i;
+      })
+      .map(({ e }) => e);
   }, [enfantsMesEligibles]);
 
   if (!parent) return null;
@@ -226,11 +262,18 @@ export default function ParentDashboard() {
   const hasTitulaire = enfantsMesEligibles.some((e) => e.statut === 'Titulaire');
   const hasSuppleantN1 = enfantsMesEligibles.some((e) => e.liste === 'attente_n1' && !e.desistement);
   const isNonInscrit = (e: Enfant) =>
-    e.rangListe == null && e.liste === 'attente_n2' && e.lienParente !== 'Autre' && e.statut !== 'Titulaire';
+    (e.sansAttributionListe === true && e.lienParente !== 'Autre' && e.statut !== 'Titulaire') ||
+    (e.rangListe == null &&
+      e.liste === 'attente_n2' &&
+      e.lienParente !== 'Autre' &&
+      e.statut !== 'Titulaire');
 
   const capListesTitulaireN1Atteint = MAX != null && placesListesParentSaison >= MAX;
   const actionsTitulaireN1BloqueesPourCarte = (e: Enfant) =>
     capListesTitulaireN1Atteint && isNonInscrit(e) && e.lienParente !== 'Autre';
+  /** Biologique déjà affecté à la liste N°2 (vraie inscription N2) : masquer Titulaire / N1 / N2, garder désistement. Ne concerne pas « Autre » ni « non inscrit ». */
+  const enfantBiologiqueSuppleantN2Place = (e: Enfant) =>
+    e.lienParente !== 'Autre' && e.liste === 'attente_n2' && !isNonInscrit(e);
   const getDemandeIdForAction = (e: Enfant | undefined): number | null => {
     if (!e) return null;
     if (typeof e.demandeId === 'number' && Number.isFinite(e.demandeId)) return e.demandeId;
@@ -358,6 +401,29 @@ export default function ParentDashboard() {
     }
   };
 
+  const setAsSuppleantN2 = async (id: string) => {
+    const current = enfants.find((e) => e.id === id);
+    const demandeId = getDemandeIdForAction(current);
+    if (!current || !token) return;
+    if (!demandeId) return;
+    try {
+      await apiRequest('/parent/suppleant-n2', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ enfant_id_titulaire: demandeId }),
+      });
+      await loadAll();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Action impossible';
+      toast({ title: 'Action impossible', description: msg, variant: 'destructive' });
+    }
+  };
+
+  /** Masquer « Suppléant N1 » sur l’enfant encore sans liste quand P+N1 sont pris et plafond ≥ 3 (emplacement réservé au bouton N2). */
+  const afficherBoutonSuppleantN1PourCarte = (e: Enfant) =>
+    e.statut !== 'Suppléant N1' &&
+    !(MAX != null && MAX >= 3 && hasTitulaire && hasSuppleantN1 && e.sansAttributionListe === true);
+
   const handleEditDemande = (enfant: Enfant) => {
     const lienApi = LIEN_PARENTE_FR_TO_API[enfant.lienParente] || 'AUTRE';
     setEditEnfantId(enfant.id);
@@ -457,7 +523,7 @@ export default function ParentDashboard() {
 
   // Card click -> open corresponding tab and highlight
   const handleCardClick = (enfant: typeof enfants[0]) => {
-    const tabKey = getListeTabKey(enfant.liste);
+    const tabKey = isNonInscrit(enfant) ? 'principale' : getListeTabKey(enfant.liste);
     setActiveTab(tabKey);
     setHighlightedEnfantId(enfant.id);
     setTimeout(() => setHighlightedEnfantId(null), 3000);
@@ -731,15 +797,13 @@ export default function ParentDashboard() {
               <AlertDescription>
                 Vous avez atteint le maximum d&apos;enfants autorisé pour la saison sur les rôles Titulaire et
                 Suppléant N°1 ({MAX} enfant{MAX != null && MAX > 1 ? 's' : ''}
-                {settings.colonieNom ? ` — ${settings.colonieNom}` : ''}). Les autres enfants éligibles restent
-                visibles ci-dessous ; pour les positionner sur ces listes, modifiez d&apos;abord vos choix
-                (désistement, changement de titulaire, etc.).
+                {settings.colonieNom ? ` — ${settings.colonieNom}` : ''}).
               </AlertDescription>
             </Alert>
           )}
         {enfantsMesEligibles.length > 0 && (
         <div className="grid gap-4 w-full max-w-4xl">
-          {enfantsMesEligibles.map((enfant, i) => (
+          {enfantsMesEligiblesOrdreAffichage.map((enfant, i) => (
             <motion.div
               key={enfant.id}
               initial={{ opacity: 0, y: 20 }}
@@ -771,7 +835,8 @@ export default function ParentDashboard() {
                       !enfant.rejetDefinitif &&
                       !listeFinaleDefinitiveApi &&
                       enfant.statut !== 'Titulaire' &&
-                      !actionsTitulaireN1BloqueesPourCarte(enfant) && (
+                      !actionsTitulaireN1BloqueesPourCarte(enfant) &&
+                      !enfantBiologiqueSuppleantN2Place(enfant) && (
                       <>
                         {(!hasTitulaire || enfant.statut === 'Suppléant N1') && (
                           <Button
@@ -787,7 +852,7 @@ export default function ParentDashboard() {
                             {enfant.statut === 'Suppléant N1' ? <><ArrowUpDown className="w-3 h-3" />Définir titulaire</> : 'Titulaire'}
                           </Button>
                         )}
-                        {enfant.statut !== 'Suppléant N1' && (
+                        {afficherBoutonSuppleantN1PourCarte(enfant) && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -797,12 +862,29 @@ export default function ParentDashboard() {
                             Suppléant N1
                           </Button>
                         )}
+                        {MAX != null &&
+                          MAX >= 3 &&
+                          hasTitulaire &&
+                          hasSuppleantN1 &&
+                          enfant.sansAttributionListe === true && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => { void setAsSuppleantN2(enfant.id); }}
+                            className="rounded-lg gap-1 text-xs !bg-transparent hover:!bg-transparent !text-foreground hover:!text-foreground"
+                          >
+                            Suppléant N2
+                          </Button>
+                        )}
                       </>
                     )}
                     {((
                       enfant.statut === 'Titulaire' ||
                       (hasTitulaire && hasSuppleantN1 && enfant.statut === 'Suppléant N1') ||
-                      (enfant.lienParente === 'Autre' && enfant.liste === 'attente_n2')
+                      (enfant.lienParente === 'Autre' && enfant.liste === 'attente_n2') ||
+                      (enfant.liste === 'attente_n2' &&
+                        enfant.lienParente !== 'Autre' &&
+                        !isNonInscrit(enfant))
                     ) && !enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi) && (
                       <Button variant="outline" size="sm" onClick={() => handleDesistement(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
                         <HandMetal className="w-3 h-3" />Désistement
@@ -839,6 +921,7 @@ export default function ParentDashboard() {
                   */}
                   {/* Afficher Rang/Liste après choix parent ; et aussi pour enfant non biologique N2. */}
                   {(enfant.statut === 'Titulaire' || (hasTitulaire && hasSuppleantN1) || (enfant.lienParente === 'Autre' && enfant.liste === 'attente_n2')) &&
+                    !isNonInscrit(enfant) &&
                     !(enfant.desistement && enfant.lienParente === 'Autre' && enfant.liste === 'attente_n2') && (
                     <div className="flex items-center gap-1.5">
                       <Hash className="w-3 h-3 text-muted-foreground" />
@@ -883,7 +966,7 @@ export default function ParentDashboard() {
                     </span>
                   )}
 
-                  {(enfant.statut === 'Titulaire' || (hasTitulaire && hasSuppleantN1)) && (
+                  {(enfant.statut === 'Titulaire' || (hasTitulaire && hasSuppleantN1)) && !isNonInscrit(enfant) && (
                     <p className="text-[10px] text-muted-foreground/60 mt-1">Cliquez sur la carte pour voir sa position dans la liste</p>
                   )}
               </div>

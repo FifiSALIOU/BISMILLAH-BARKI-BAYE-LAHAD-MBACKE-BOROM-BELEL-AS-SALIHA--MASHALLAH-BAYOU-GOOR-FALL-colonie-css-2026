@@ -34,6 +34,7 @@ from app.services.inscriptions import (
     reinscrire_desiste,
     request_desistement,
     set_suppleant_n1,
+    set_suppleant_n2,
     set_titulaire,
 )
 from app.services.users import (
@@ -473,6 +474,17 @@ def definir_suppleant_n1(
     user: User = Depends(require_roles(UserRole.PARENT)),
 ):
     set_suppleant_n1(db=db, user=user, enfant_id_suppleant=payload.enfant_id_titulaire)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/suppleant-n2")
+def definir_suppleant_n2(
+    payload: TitulaireUpdateIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.PARENT)),
+):
+    set_suppleant_n2(db=db, user=user, enfant_id_suppleant=payload.enfant_id_titulaire)
     db.commit()
     return {"ok": True}
 

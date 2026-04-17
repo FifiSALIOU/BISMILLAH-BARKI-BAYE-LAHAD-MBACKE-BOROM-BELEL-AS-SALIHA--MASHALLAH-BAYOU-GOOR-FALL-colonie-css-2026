@@ -934,6 +934,8 @@ def stats_summary(
         selected_total = len(liste_finale_ordered)
         by_liste_map = {}
         for d in liste_finale_ordered:
+            if d.liste is None:
+                continue
             k = d.liste.code.value
             by_liste_map[k] = by_liste_map.get(k, 0) + 1
 
@@ -971,14 +973,18 @@ def stats_summary(
     recent_activity: list[dict] = []
     for d in recent_demandes:
         e = d.enfant
+        if e is None:
+            continue
         p = e.parent
-        lc = d.liste.code
+        lc = d.liste.code if d.liste is not None else None
         if lc == ListeCode.PRINCIPALE:
             liste_ui = "principale"
         elif lc == ListeCode.ATTENTE_N1:
             liste_ui = "attente_n1"
-        else:
+        elif lc == ListeCode.ATTENTE_N2:
             liste_ui = "attente_n2"
+        else:
+            liste_ui = "inconnue"
         di = d.date_inscription
         date_iso = di.isoformat() if hasattr(di, "isoformat") else str(di)
         recent_activity.append(
@@ -986,9 +992,9 @@ def stats_summary(
                 "id": str(e.id),
                 "prenom": e.prenom,
                 "nom": e.nom,
-                "parent_prenom": p.prenom,
-                "parent_nom": p.nom,
-                "parent_matricule": p.matricule,
+                "parent_prenom": p.prenom if p is not None else "",
+                "parent_nom": p.nom if p is not None else "",
+                "parent_matricule": p.matricule if p is not None else "",
                 "liste": liste_ui,
                 "date_inscription": date_iso,
             }

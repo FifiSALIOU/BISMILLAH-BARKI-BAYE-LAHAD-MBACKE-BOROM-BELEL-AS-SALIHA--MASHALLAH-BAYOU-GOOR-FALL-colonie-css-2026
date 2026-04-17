@@ -39,6 +39,8 @@ export interface Enfant {
   informationsValideesParAdmin?: boolean;
   /** Refus administratif définitif (plus aucune action côté parent). */
   rejetDefinitif?: boolean;
+  /** `true` si l’API renvoie `liste_code === 'NON_INSCRIT'` (aucune liste P/N1/N2 attribuée) — lecture seule pour l’affichage. */
+  sansAttributionListe?: boolean;
 }
 
 export interface Inscription {

@@ -153,6 +153,7 @@ export function mapDemandeOutToEnfant(d: DemandeOutApi, parentMatricule: string)
     motifRefus,
     reinscrit: !!d.is_reinscrit,
     rejetDefinitif: !!d.rejet_definitif,
+    sansAttributionListe: d.liste_code === 'NON_INSCRIT',
   };
 }
 
@@ -198,6 +199,7 @@ export function mapListeFinaleRowToEnfant(row: ListeFinaleRowApi): Enfant {
     statut: statutFromDemande({ liste_code: row.liste_code }),
     dateInscription,
     validation: 'validé',
+    sansAttributionListe: row.liste_code === 'NON_INSCRIT',
   };
 }
 
