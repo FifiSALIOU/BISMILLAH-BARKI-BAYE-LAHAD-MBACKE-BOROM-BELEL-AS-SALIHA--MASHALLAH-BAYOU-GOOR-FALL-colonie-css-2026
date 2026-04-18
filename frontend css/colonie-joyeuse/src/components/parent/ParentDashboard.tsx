@@ -1273,20 +1273,8 @@ export default function ParentDashboard() {
               <DialogTitle className="text-foreground">Limite atteinte</DialogTitle>
             </div>
             <DialogDescription className="pt-2 text-sm text-muted-foreground">
-              Vous avez atteint votre limite pour cette saison : vous ne pouvez plus attribuer de rôles supplémentaires
-              (Titulaire, Suppléant N°1 et, le cas échéant, Suppléant N°2) au-delà du nombre maximal autorisé pour votre
-              foyer
-              {MAX != null ? (
-                <>
-                  {' '}
-                  (
-                  <span className="font-medium text-foreground">{MAX}</span> enfant{MAX > 1 ? 's' : ''}
-                  {settings.colonieNom ? ` — ${settings.colonieNom}` : ''})
-                </>
-              ) : (
-                ''
-              )}
-              , conformément au paramétrage défini par l&apos;administration.
+              Vous avez atteint le nombre maximum d&apos;inscriptions autorisées (2 enfants) pour la Colonie de Vacances
+              2026.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
