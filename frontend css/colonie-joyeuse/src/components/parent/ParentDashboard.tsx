@@ -119,6 +119,7 @@ export default function ParentDashboard() {
     setListeFinaleApiEnfants([]);
     setListeFinaleApiParents([]);
     setDemandesParentChargees(false);
+    prevPlacesListesPourLimiteRef.current = null;
   }, [parent?.matricule, token]);
 
   useEffect(() => {
@@ -132,6 +133,9 @@ export default function ParentDashboard() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [selectedName, setSelectedName] = useState('');
+  const [confirmSuppleantN1Open, setConfirmSuppleantN1Open] = useState(false);
+  const [suppleantN1SelectedId, setSuppleantN1SelectedId] = useState('');
+  const [suppleantN1SelectedName, setSuppleantN1SelectedName] = useState('');
   const [desistementOpen, setDesistementOpen] = useState(false);
   const [desistementId, setDesistementId] = useState('');
   const [desistementName, setDesistementName] = useState('');
@@ -156,6 +160,9 @@ export default function ParentDashboard() {
   const [phoneSaving, setPhoneSaving] = useState(false);
   const [ordreRolesDialogOpen, setOrdreRolesDialogOpen] = useState(false);
   const [ordreRolesDialogText, setOrdreRolesDialogText] = useState('');
+  /** Évite un pop-up au premier chargement ; réinitialisé avec le compte parent (matricule / token). */
+  const prevPlacesListesPourLimiteRef = useRef<number | null>(null);
+  const [limiteRolesSaisonDialogOpen, setLimiteRolesSaisonDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!listeFinaleApiPubliee && activeTab === 'liste_finale') {
@@ -419,7 +426,7 @@ export default function ParentDashboard() {
     setReinscrireOpen(false);
   };
 
-  const setAsSuppleantN1 = async (id: string) => {
+  const handleSuppleantN1Click = (id: string, name: string) => {
     if (!hasTitulaire) {
       setOrdreRolesDialogText(
         'Vous devez d’abord désigner l’enfant titulaire avant de placer un suppléant N°1.',
@@ -427,10 +434,22 @@ export default function ParentDashboard() {
       setOrdreRolesDialogOpen(true);
       return;
     }
-    const current = enfants.find((e) => e.id === id);
+    setSuppleantN1SelectedId(id);
+    setSuppleantN1SelectedName(name);
+    setConfirmSuppleantN1Open(true);
+  };
+
+  const confirmSuppleantN1 = async () => {
+    const current = enfants.find((e) => e.id === suppleantN1SelectedId);
     const demandeId = getDemandeIdForAction(current);
-    if (!current || !token) return;
-    if (!demandeId) return;
+    if (!current || !token) {
+      setConfirmSuppleantN1Open(false);
+      return;
+    }
+    if (!demandeId) {
+      setConfirmSuppleantN1Open(false);
+      return;
+    }
     try {
       await apiRequest('/parent/suppleant-n1', {
         method: 'POST',
@@ -442,6 +461,7 @@ export default function ParentDashboard() {
       const msg = err instanceof Error ? err.message : 'Action impossible';
       toast({ title: 'Action impossible', description: msg, variant: 'destructive' });
     }
+    setConfirmSuppleantN1Open(false);
   };
 
   const setAsSuppleantN2 = async (id: string) => {
@@ -701,6 +721,23 @@ export default function ParentDashboard() {
     prevNonBioCountRef.current = nonBioInscriptionsCount;
   }, [parentQueDesNonBio, nonBioInscriptionsCount]);
 
+  useEffect(() => {
+    if (!demandesParentChargees) return;
+    if (inscriptionsCloturees || MAX == null) {
+      prevPlacesListesPourLimiteRef.current = placesListesParentSaison;
+      return;
+    }
+    const prev = prevPlacesListesPourLimiteRef.current;
+    if (prev === null) {
+      prevPlacesListesPourLimiteRef.current = placesListesParentSaison;
+      return;
+    }
+    if (prev < MAX && placesListesParentSaison >= MAX) {
+      setLimiteRolesSaisonDialogOpen(true);
+    }
+    prevPlacesListesPourLimiteRef.current = placesListesParentSaison;
+  }, [demandesParentChargees, inscriptionsCloturees, MAX, placesListesParentSaison]);
+
   if (!hasRequiredPhone) {
     return (
       <div className="w-full max-w-5xl space-y-8 pl-[170px]">
@@ -904,7 +941,7 @@ export default function ParentDashboard() {
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={() => { void setAsSuppleantN1(enfant.id); }}
+                            onClick={() => handleSuppleantN1Click(enfant.id, `${enfant.prenom} ${enfant.nom}`)}
                             className="rounded-lg gap-1 text-xs !bg-transparent hover:!bg-transparent !text-foreground hover:!text-foreground"
                           >
                             Suppléant N1
@@ -1151,6 +1188,28 @@ export default function ParentDashboard() {
         </DialogContent>
       </Dialog>
 
+      {/* Confirm Suppléant N1 */}
+      <Dialog open={confirmSuppleantN1Open} onOpenChange={setConfirmSuppleantN1Open}>
+        <DialogContent className="sm:max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Définir le suppléant N°1</DialogTitle>
+            <DialogDescription className="pt-2">
+              {`\u00CAtes-vous sûr de vouloir définir `}
+              <strong>{suppleantN1SelectedName}</strong>
+              {` comme suppléant N°1 (liste d'attente N°1) ?`}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmSuppleantN1Open(false)} className="rounded-lg">
+              Annuler
+            </Button>
+            <Button onClick={() => { void confirmSuppleantN1(); }} className="rounded-lg bg-accent text-white hover:bg-accent/90">
+              Confirmer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Confirm Désistement */}
       <Dialog open={desistementOpen} onOpenChange={setDesistementOpen}>
         <DialogContent className="sm:max-w-lg rounded-xl overflow-hidden">
@@ -1198,6 +1257,41 @@ export default function ParentDashboard() {
             </DialogDescription>
           </DialogHeader>
           <DialogFooter><Button onClick={() => setCancelDesistError(false)} className="bg-primary text-primary-foreground rounded-lg">Compris</Button></DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Plafond Titulaire / N1 / N2 (paramètre max enfants / parent) — affichage seul, sans changer la logique métier */}
+      <Dialog open={limiteRolesSaisonDialogOpen} onOpenChange={setLimiteRolesSaisonDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-xl">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 shrink-0 rounded-xl bg-amber-100 flex items-center justify-center">
+                <UserCheck className="w-5 h-5 text-amber-700" />
+              </div>
+              <DialogTitle className="text-foreground">Limite atteinte</DialogTitle>
+            </div>
+            <DialogDescription className="pt-2 text-sm text-muted-foreground">
+              Vous avez atteint votre limite pour cette saison : vous ne pouvez plus attribuer de rôles supplémentaires
+              (Titulaire, Suppléant N°1 et, le cas échéant, Suppléant N°2) au-delà du nombre maximal autorisé pour votre
+              foyer
+              {MAX != null ? (
+                <>
+                  {' '}
+                  (
+                  <span className="font-medium text-foreground">{MAX}</span> enfant{MAX > 1 ? 's' : ''}
+                  {settings.colonieNom ? ` — ${settings.colonieNom}` : ''})
+                </>
+              ) : (
+                ''
+              )}
+              , conformément au paramétrage défini par l&apos;administration.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setLimiteRolesSaisonDialogOpen(false)} className="rounded-lg bg-primary text-primary-foreground">
+              Compris
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
