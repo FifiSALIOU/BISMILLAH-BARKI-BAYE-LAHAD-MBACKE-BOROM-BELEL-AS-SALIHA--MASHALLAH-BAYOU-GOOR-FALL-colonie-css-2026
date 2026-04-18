@@ -413,6 +413,7 @@ def list_inscriptions_transparence(
                 parent_prenom=p.prenom,
                 parent_nom=p.nom,
                 parent_service=p.service_text,
+                parent_site=(p.site_text or "").strip(),
                 enfant_prenom=e.prenom,
                 enfant_nom=e.nom,
                 enfant_date_naissance=e.date_naissance,

@@ -654,6 +654,7 @@ export default function ParentDashboard() {
                 <TableHead className="font-semibold">Matricule</TableHead>
                 <TableHead className="font-semibold">Nom du parent</TableHead>
                 <TableHead className="font-semibold">Prénom du parent</TableHead>
+                <TableHead className="font-semibold">Agence</TableHead>
                 <TableHead className="font-semibold">Service</TableHead>
                 <TableHead className="font-semibold">Prénom Enfant</TableHead>
                 <TableHead className="font-semibold">Nom Enfant</TableHead>
@@ -665,7 +666,7 @@ export default function ParentDashboard() {
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={11} className="text-center py-8 text-muted-foreground">Aucune inscription</TableCell></TableRow>
+                <TableRow><TableCell colSpan={12} className="text-center py-8 text-muted-foreground">Aucune inscription</TableCell></TableRow>
               ) : (
                 filtered.map(e => {
                   const p = allParents.find(x => x.matricule === e.parentMatricule);
@@ -683,6 +684,7 @@ export default function ParentDashboard() {
                       <TableCell className="font-mono tabular-nums text-sm">{e.parentMatricule}</TableCell>
                       <TableCell>{p?.nom || '—'}</TableCell>
                       <TableCell>{p?.prenom || '—'}</TableCell>
+                      <TableCell className="text-sm">{p?.site?.trim() ? p.site : '—'}</TableCell>
                       <TableCell className="text-sm">{p?.service || '—'}</TableCell>
                       <TableCell>{e.prenom}</TableCell>
                       <TableCell className="font-medium">{e.nom}</TableCell>

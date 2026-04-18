@@ -38,6 +38,8 @@ export type TransparenceRowApi = {
   parent_prenom: string;
   parent_nom: string;
   parent_service: string;
+  /** Agence / site parent (aligné sur l’admin, champ `parent_site`). */
+  parent_site?: string;
   enfant_prenom: string;
   enfant_nom: string;
   enfant_date_naissance: string;
@@ -212,6 +214,7 @@ export function parentsFromTransparence(rows: TransparenceRowApi[]): Parent[] {
         prenom: r.parent_prenom,
         nom: r.parent_nom,
         service: r.parent_service,
+        site: (r.parent_site ?? '').trim() || undefined,
         motDePasse: '',
       });
     }

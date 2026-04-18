@@ -54,6 +54,7 @@ class TransparenceInscriptionOut(BaseModel):
     parent_prenom: str
     parent_nom: str
     parent_service: str
+    parent_site: str = Field(default="", description="Libellé agence / site (transparence, lecture seule).")
     enfant_prenom: str
     enfant_nom: str
     enfant_date_naissance: date
