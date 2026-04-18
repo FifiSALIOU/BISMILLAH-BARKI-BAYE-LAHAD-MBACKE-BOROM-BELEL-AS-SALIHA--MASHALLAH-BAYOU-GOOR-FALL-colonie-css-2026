@@ -874,6 +874,7 @@ export default function ParentDashboard() {
             )}
           </div>
         )}
+        {/* Bandeau « maximum atteint » masqué à la demande (logique métier inchangée : capListesTitulaireN1Atteint, etc.).
         {capListesTitulaireN1Atteint &&
           enfantsMesEligibles.some((e) => isNonInscrit(e) && e.lienParente !== 'Autre') &&
           !inscriptionsCloturees && (
@@ -886,6 +887,7 @@ export default function ParentDashboard() {
               </AlertDescription>
             </Alert>
           )}
+        */}
         {enfantsMesEligibles.length > 0 && (
         <div className="grid gap-4 w-full max-w-4xl">
           {enfantsMesEligiblesOrdreAffichage.map((enfant, i) => (
