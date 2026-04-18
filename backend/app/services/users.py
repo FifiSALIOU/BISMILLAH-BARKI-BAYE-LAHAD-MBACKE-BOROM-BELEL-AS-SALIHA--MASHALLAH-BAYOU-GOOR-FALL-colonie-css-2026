@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import HTTPException, status
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.enums import UserRole
@@ -178,9 +179,20 @@ def create_user_superadmin(
             site_id=site.id if site else None,
             user_id=user.id,
         )
-        db.add(parent)
-        db.flush()
+        # Avant INSERT : évite un 500 sur la contrainte unique (vérification Python après flush était trop tard).
         raise_if_parent_telephone_conflict(db, tel_stash=telephone, parent=parent)
+        db.add(parent)
+        try:
+            db.flush()
+        except IntegrityError as e:
+            db.rollback()
+            raw = str(getattr(e, "orig", e) or e).lower()
+            if "telephone" in raw or "parents_telephone" in raw:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=TELEPHONE_DEJA_UTILISE_DETAIL,
+                ) from None
+            raise
         return user
 
     if role in {UserRole.GESTIONNAIRE, UserRole.SUPER_ADMIN}:
@@ -349,7 +361,8 @@ def update_user(
         if parent_telephone is not None:
             tel = normalize_parent_telephone_for_storage(parent_telephone, matricule=parent.matricule)
             raise_if_parent_telephone_conflict(db, tel_stash=tel, parent=parent)
-            parent.telephone = tel
+            # Colonne non nullable : chaîne vide si l’admin efface le numéro (normalize → None).
+            parent.telephone = tel if tel is not None else ""
         if parent_service is not None:
             service = _get_or_create_service(db, parent_service)
             parent.service_id = service.id

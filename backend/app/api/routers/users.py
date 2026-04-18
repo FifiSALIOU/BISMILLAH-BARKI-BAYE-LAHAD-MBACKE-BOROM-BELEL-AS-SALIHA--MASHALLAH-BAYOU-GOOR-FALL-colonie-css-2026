@@ -6,7 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from pydantic import ValidationError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
@@ -109,6 +109,7 @@ def _send_admin_password_reset_email(contact: str, temp_password: str) -> None:
 def build_user_out(u: User) -> UserOut:
     email = _admin_contact_email(u)
     parent_prenom = parent_nom = parent_service = parent_site_code = parent_telephone = None
+    parent_nb_enfants: int | None = None
     matricule_out = u.matricule
     if u.role == UserRole.PARENT and u.parent_profile:
         pp = u.parent_profile
@@ -118,10 +119,20 @@ def build_user_out(u: User) -> UserOut:
             matricule_out = m
         parent_prenom = pp.prenom
         parent_nom = pp.nom
-        parent_service = pp.service_text
+        if pp.service_obj is not None and (pp.service_obj.nom or "").strip():
+            parent_service = (pp.service_obj.nom or "").strip()
+        else:
+            st = (pp.service_text or "").strip()
+            # Données parfois incohérentes : même acronyme enregistré deux fois d’affilée (ex. D.E.S.I.FD.E.S.I.F).
+            if st and len(st) >= 2 and len(st) % 2 == 0:
+                half = st[: len(st) // 2]
+                if half == st[len(st) // 2 :]:
+                    st = half
+            parent_service = st if st else None
         parent_telephone = _public_parent_telephone(pp.telephone)
         parent_site_code = str(pp.site_obj.code) if pp.site_obj else (pp.site_text or None)
         email = pp.email or email
+        parent_nb_enfants = len(pp.enfants or [])
     return UserOut(
         id=u.id,
         name=u.name,
@@ -134,6 +145,7 @@ def build_user_out(u: User) -> UserOut:
         parent_service=parent_service,
         parent_site_code=parent_site_code,
         parent_telephone=parent_telephone,
+        parent_nb_enfants=parent_nb_enfants,
     )
 
 
@@ -145,7 +157,11 @@ def list_users(
     _ = db, admin
     users = (
         db.query(User)
-        .options(joinedload(User.parent_profile).joinedload(Parent.site_obj))
+        .options(
+            joinedload(User.parent_profile).joinedload(Parent.site_obj),
+            joinedload(User.parent_profile).joinedload(Parent.service_obj),
+            joinedload(User.parent_profile).selectinload(Parent.enfants),
+        )
         .order_by(User.id.asc())
         .all()
     )

@@ -60,6 +60,8 @@ export interface AdminUser {
   dateCreation: string;
   motDePasse: string;
   telephone?: string;
+  /** Présent côté API liste utilisateurs (filtre super admin). */
+  matricule?: string;
 }
 
 export interface HistoriqueEntry {

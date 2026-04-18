@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { AdminUser, Parent } from '@/data/mockData';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { UserPlus, Pencil, Trash2, Shield, Users, Upload, KeyRound, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { UserPlus, Pencil, Trash2, Shield, Users, Upload, KeyRound, FileSpreadsheet, Loader2, Search } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import ImportExcel from './ImportExcel';
@@ -16,9 +16,51 @@ import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/lib/api';
 import type { ImportResult } from './ImportExcel';
 
+/** Un seul item par libellé : évite deux <SelectItem value="…"> identiques (Radix / affichage cassé). */
+function dedupeServicesByNom(list: Array<{ id: number; nom: string }>): Array<{ id: number; nom: string }> {
+  const seen = new Set<string>();
+  const out: Array<{ id: number; nom: string }> = [];
+  for (const s of list) {
+    const k = (s.nom || '').trim().toLowerCase();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    out.push(s);
+  }
+  return out;
+}
+
+/** Si le texte est « X » répété deux fois et X est un service connu, ne garder qu’un X. */
+function repairDoubledServiceLabel(raw: string, catalog: Array<{ nom: string }>): string {
+  const t = (raw || '').trim();
+  if (t.length < 2 || t.length % 2 !== 0) return t;
+  const half = t.slice(0, t.length / 2);
+  if (half !== t.slice(t.length / 2)) return t;
+  const known = catalog.some((c) => {
+    const n = (c.nom || '').trim();
+    return n === half || n.toLowerCase() === half.toLowerCase();
+  });
+  return known ? (catalog.find((c) => (c.nom || '').trim().toLowerCase() === half.toLowerCase())?.nom ?? half) : t;
+}
+
+function serviceValueForSelect(raw: string, catalog: Array<{ nom: string }>): string {
+  const t = repairDoubledServiceLabel((raw || '').trim(), catalog);
+  if (!t) return '';
+  const exact = catalog.find((s) => s.nom === t);
+  if (exact) return exact.nom;
+  const fold = catalog.find((s) => s.nom.trim().toLowerCase() === t.toLowerCase());
+  return fold ? fold.nom : t;
+}
+
+/** Filtre local : une sous-chaîne suffit sur l’un des champs (insensible à la casse). */
+function matchesUserFilter(parts: string[], query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return parts.some((p) => (p || '').toLowerCase().includes(q));
+}
+
 export default function GestionUtilisateurs() {
   const { token } = useAuth();
-  type ParentRow = Parent & { userId: string; actif: boolean };
+  type ParentRow = Parent & { userId: string; actif: boolean; nbEnfants: number };
   const [parents, setParents] = useState<ParentRow[]>([]);
   const [admins, setAdmins] = useState<AdminUser[]>([]);
   const [sites, setSites] = useState<Array<{ id: number; nom: string; code: string }>>([]);
@@ -54,6 +96,9 @@ export default function GestionUtilisateurs() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importExcelOpen, setImportExcelOpen] = useState(false);
+  const [filterAdmins, setFilterAdmins] = useState('');
+  const [filterParents, setFilterParents] = useState('');
+  const [filterParentsEnfants, setFilterParentsEnfants] = useState<'tous' | 'avec' | 'sans'>('tous');
 
   const splitName = (fullName: string | null | undefined) => {
     const s = (fullName || '').trim();
@@ -72,6 +117,7 @@ export default function GestionUtilisateurs() {
         ...splitName(u.name),
         id: String(u.id),
         email: u.email || '',
+        matricule: u.matricule || '',
         nom: splitName(u.name).nom,
         prenom: splitName(u.name).prenom,
         role: u.role === 'SUPER_ADMIN' ? 'super_admin' : 'gestionnaire',
@@ -95,6 +141,7 @@ export default function GestionUtilisateurs() {
         telephone: u.parent_telephone || '',
         premiereConnexion: false,
         actif: !!u.is_active,
+        nbEnfants: typeof u.parent_nb_enfants === 'number' ? u.parent_nb_enfants : 0,
       }));
     setAdmins(mappedAdmins);
     setParents(mappedParents);
@@ -125,8 +172,41 @@ export default function GestionUtilisateurs() {
   const refreshServices = async () => {
     if (!token) return;
     const rows = await apiRequest<any[]>('/admin/services', { token });
-    setServices(rows.map((s) => ({ id: s.id, nom: s.nom })));
+    setServices(dedupeServicesByNom(rows.map((s) => ({ id: s.id, nom: s.nom }))));
   };
+
+  const servicesForSelect = useMemo(() => dedupeServicesByNom(services), [services]);
+
+  const filteredAdmins = useMemo(() => {
+    return admins.filter((a) =>
+      matchesUserFilter(
+        [
+          a.matricule || '',
+          a.prenom,
+          a.nom,
+          a.email,
+          a.role === 'super_admin' ? 'super admin' : 'gestionnaire',
+        ],
+        filterAdmins,
+      ),
+    );
+  }, [admins, filterAdmins]);
+
+  const filteredParents = useMemo(() => {
+    return parents.filter((p) => {
+      const siteRow = sites.find((s) => String(s.code) === String(p.site || p.site_code || ''));
+      const siteNom = siteRow?.nom || '';
+      const siteCode = p.site || p.site_code || '';
+      const textOk = matchesUserFilter(
+        [p.matricule, p.prenom, p.nom, p.service, siteCode, siteNom, p.email || '', p.telephone || ''],
+        filterParents,
+      );
+      if (!textOk) return false;
+      if (filterParentsEnfants === 'avec' && p.nbEnfants < 1) return false;
+      if (filterParentsEnfants === 'sans' && p.nbEnfants !== 0) return false;
+      return true;
+    });
+  }, [parents, sites, filterParents, filterParentsEnfants]);
 
   useEffect(() => {
     if (!token) return;
@@ -322,25 +402,30 @@ export default function GestionUtilisateurs() {
 
   const handleCreateParent = async () => {
     if (!newParentMatricule || !newParentPrenom || !newParentNom || !newParentService) return;
-    await apiRequest('/admin/users', {
-      method: 'POST',
-      token,
-      body: JSON.stringify({
-        matricule: newParentMatricule,
-        name: `${newParentPrenom} ${newParentNom}`.trim(),
-        prenom: newParentPrenom,
-        nom: newParentNom,
-        role: 'PARENT',
-        service: newParentService,
-        site_code: newParentSite || null,
-        email: newParentEmail || null,
-        telephone: newParentTelephone || null,
-      }),
-    });
-    await refreshUsers();
-    setCreateParentOpen(false);
-    setNewParentMatricule(''); setNewParentPrenom(''); setNewParentNom(''); setNewParentService(''); setNewParentEmail(''); setNewParentTelephone(''); setNewParentSite('');
-    toast({ title: '✅ Parent créé' });
+    try {
+      await apiRequest('/admin/users', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          matricule: newParentMatricule,
+          name: `${newParentPrenom} ${newParentNom}`.trim(),
+          prenom: newParentPrenom,
+          nom: newParentNom,
+          role: 'PARENT',
+          service: newParentService,
+          site_code: newParentSite || null,
+          email: newParentEmail || null,
+          telephone: newParentTelephone || null,
+        }),
+      });
+      await refreshUsers();
+      setCreateParentOpen(false);
+      setNewParentMatricule(''); setNewParentPrenom(''); setNewParentNom(''); setNewParentService(''); setNewParentEmail(''); setNewParentTelephone(''); setNewParentSite('');
+      toast({ title: '✅ Parent créé' });
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Une erreur est survenue.';
+      toast({ title: 'Création impossible', description: msg, variant: 'destructive' });
+    }
   };
 
   const handleEditParent = async () => {
@@ -362,7 +447,8 @@ export default function GestionUtilisateurs() {
           parent_service: editingParent.service,
           parent_site_code: editingParent.site || null,
           email: editingParent.email || null,
-          parent_telephone: editingParent.telephone || null,
+          // Chaîne vide pour effacer le téléphone (null = le backend ne modifie pas la colonne).
+          parent_telephone: (editingParent.telephone ?? '').trim(),
         }),
       });
       await refreshUsers();
@@ -450,14 +536,48 @@ export default function GestionUtilisateurs() {
       </motion.div>
 
       <Tabs defaultValue="admins">
-        <TabsList className="rounded-lg">
-          <TabsTrigger value="admins" className="gap-2 rounded-lg"><Shield className="w-4 h-4" />Administrateurs</TabsTrigger>
-          <TabsTrigger value="parents" className="gap-2 rounded-lg"><Users className="w-4 h-4" />Agents CSS / Parents</TabsTrigger>
+        <TabsList className="flex h-auto min-h-11 w-full max-w-2xl flex-row items-stretch gap-1.5 rounded-xl border border-border/50 bg-muted/40 p-1.5 shadow-sm sm:w-fit">
+          <TabsTrigger
+            value="admins"
+            aria-label={`Administrateurs, ${admins.length} compte${admins.length !== 1 ? 's' : ''}`}
+            className="group flex flex-1 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors hover:text-foreground/90 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md sm:flex-initial sm:px-4 sm:py-2"
+          >
+            <Shield className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-data-[state=active]:text-[#FF8000]" />
+            <span className="min-w-0 flex-1 truncate sm:flex-initial" title="Administrateurs">
+              Administrateurs
+            </span>
+            <span className="inline-flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/90 px-2.5 text-xs font-semibold tabular-nums text-foreground/80 shadow-sm transition-all group-data-[state=active]:border-transparent group-data-[state=active]:bg-[#FF8000] group-data-[state=active]:text-white group-data-[state=active]:shadow-none">
+              {admins.length}
+            </span>
+          </TabsTrigger>
+          <TabsTrigger
+            value="parents"
+            aria-label={`Agents CSS et parents, ${parents.length} compte${parents.length !== 1 ? 's' : ''}`}
+            className="group flex flex-1 items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors hover:text-foreground/90 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md sm:flex-initial sm:px-4 sm:py-2"
+          >
+            <Users className="h-4 w-4 shrink-0 text-muted-foreground transition-colors group-data-[state=active]:text-[#FF8000]" />
+            <span className="min-w-0 flex-1 truncate sm:max-w-none sm:flex-initial sm:whitespace-nowrap" title="Agents CSS / Parents">
+              Agents CSS / Parents
+            </span>
+            <span className="inline-flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-full border border-border/60 bg-background/90 px-2.5 text-xs font-semibold tabular-nums text-foreground/80 shadow-sm transition-all group-data-[state=active]:border-transparent group-data-[state=active]:bg-[#FF8000] group-data-[state=active]:text-white group-data-[state=active]:shadow-none">
+              {parents.length}
+            </span>
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="admins" className="mt-6 space-y-4">
-          <div className="flex justify-end">
-            <Button onClick={() => setCreateOpen(true)} className="gap-2 rounded-lg bg-primary text-primary-foreground">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="relative w-full sm:max-w-md">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={filterAdmins}
+                onChange={(e) => setFilterAdmins(e.target.value)}
+                placeholder="Filtrer : matricule, prénom, nom, e-mail, rôle…"
+                className="rounded-lg pl-9"
+                aria-label="Filtrer les administrateurs"
+              />
+            </div>
+            <Button onClick={() => setCreateOpen(true)} className="gap-2 rounded-lg bg-primary text-primary-foreground shrink-0">
               <UserPlus className="w-4 h-4" />Nouvel administrateur
             </Button>
           </div>
@@ -474,7 +594,16 @@ export default function GestionUtilisateurs() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {admins.map(a => (
+                {filteredAdmins.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                      {admins.length === 0
+                        ? 'Aucun administrateur enregistré.'
+                        : 'Aucun administrateur ne correspond au filtre.'}
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+                {filteredAdmins.map(a => (
                   <TableRow key={a.id}>
                     <TableCell className="font-medium">{a.nom}</TableCell>
                     <TableCell>{a.prenom}</TableCell>
@@ -505,6 +634,33 @@ export default function GestionUtilisateurs() {
         </TabsContent>
 
         <TabsContent value="parents" className="mt-6 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="relative w-full max-w-md flex-1 min-w-[12rem]">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={filterParents}
+                onChange={(e) => setFilterParents(e.target.value)}
+                placeholder="Filtrer : matricule, prénom, nom, service, site, e-mail…"
+                className="rounded-lg pl-9"
+                aria-label="Filtrer les parents"
+              />
+            </div>
+            <div className="w-full sm:w-auto sm:min-w-[14rem]">
+              <Label htmlFor="filter-parents-enfants" className="sr-only">
+                Filtrer par présence d&apos;enfants
+              </Label>
+              <Select value={filterParentsEnfants} onValueChange={(v: 'tous' | 'avec' | 'sans') => setFilterParentsEnfants(v)}>
+                <SelectTrigger id="filter-parents-enfants" className="rounded-lg w-full" aria-label="Enfants : tous, avec ou sans">
+                  <SelectValue placeholder="Enfants" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tous">Tous les parents</SelectItem>
+                  <SelectItem value="avec">Avec au moins un enfant</SelectItem>
+                  <SelectItem value="sans">Sans enfant</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
           <div className="flex justify-end gap-2">
             <input ref={fileInputRef} type="file" accept=".csv" onChange={handleCSVUpload} className="hidden" />
             <Button variant="outline" onClick={() => fileInputRef.current?.click()} className="gap-2 rounded-lg">
@@ -522,17 +678,28 @@ export default function GestionUtilisateurs() {
                   <TableHead className="font-semibold">Nom</TableHead>
                   <TableHead className="font-semibold">Prénom</TableHead>
                   <TableHead className="font-semibold">Service</TableHead>
+                  <TableHead className="font-semibold tabular-nums">Enfants</TableHead>
                   <TableHead className="font-semibold">Statut</TableHead>
                   <TableHead className="font-semibold">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {parents.map(p => (
-                  <TableRow key={p.matricule}>
+                {filteredParents.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                      {parents.length === 0
+                        ? 'Aucun parent enregistré.'
+                        : 'Aucun parent ne correspond au filtre.'}
+                    </TableCell>
+                  </TableRow>
+                ) : null}
+                {filteredParents.map(p => (
+                  <TableRow key={p.userId}>
                     <TableCell className="font-mono tabular-nums text-sm">{p.matricule}</TableCell>
                     <TableCell className="font-medium">{p.nom}</TableCell>
                     <TableCell>{p.prenom}</TableCell>
                     <TableCell className="text-sm">{p.service}</TableCell>
+                    <TableCell className="tabular-nums text-sm text-center">{p.nbEnfants}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Switch
@@ -547,7 +714,20 @@ export default function GestionUtilisateurs() {
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
-                        <Button size="sm" variant="ghost" onClick={() => { setEditingParent({ ...p }); setEditParentOpen(true); }} className="h-8 w-8 p-0"><Pencil className="w-3 h-3" /></Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            setEditingParent({
+                              ...p,
+                              service: serviceValueForSelect(p.service, servicesForSelect),
+                            });
+                            setEditParentOpen(true);
+                          }}
+                          className="h-8 w-8 p-0"
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </Button>
                         <Button size="sm" variant="ghost" onClick={() => { setResetPwdTarget({ type: 'parent', id: p.matricule, name: `${p.prenom} ${p.nom}` }); setResetPwdOpen(true); }} className="h-8 w-8 p-0"><KeyRound className="w-3 h-3" /></Button>
                         <Button size="sm" variant="ghost" onClick={() => void handleDeleteParent(p.userId)} className="h-8 w-8 p-0 text-destructive hover:text-destructive"><Trash2 className="w-3 h-3" /></Button>
                       </div>
@@ -649,7 +829,7 @@ export default function GestionUtilisateurs() {
               <Select value={newParentService} onValueChange={setNewParentService}>
                 <SelectTrigger className="rounded-lg"><SelectValue placeholder="Sélectionner un service" /></SelectTrigger>
                 <SelectContent className="max-h-56 overflow-y-auto">
-                  {services.map(s => (
+                  {servicesForSelect.map(s => (
                     <SelectItem key={s.id} value={s.nom}>{s.nom}</SelectItem>
                   ))}
                 </SelectContent>
@@ -705,10 +885,17 @@ export default function GestionUtilisateurs() {
               </div>
               <div className="space-y-2">
                 <Label>Service</Label>
-                <Select value={editingParent.service} onValueChange={v => setEditingParent({ ...editingParent, service: v })}>
+                <Select
+                  value={editingParent.service || undefined}
+                  onValueChange={(v) => setEditingParent({ ...editingParent, service: v })}
+                >
                   <SelectTrigger className="rounded-lg"><SelectValue placeholder="Sélectionner un service" /></SelectTrigger>
                   <SelectContent className="max-h-56 overflow-y-auto">
-                    {services.map(s => (
+                    {editingParent.service &&
+                      !servicesForSelect.some((s) => s.nom === editingParent.service) && (
+                        <SelectItem value={editingParent.service}>{editingParent.service}</SelectItem>
+                      )}
+                    {servicesForSelect.map((s) => (
                       <SelectItem key={s.id} value={s.nom}>{s.nom}</SelectItem>
                     ))}
                   </SelectContent>

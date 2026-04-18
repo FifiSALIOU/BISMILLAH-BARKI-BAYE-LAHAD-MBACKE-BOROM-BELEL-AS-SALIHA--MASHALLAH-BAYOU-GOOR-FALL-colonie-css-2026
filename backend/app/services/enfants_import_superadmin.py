@@ -79,8 +79,8 @@ def _norm_name(s: str) -> str:
     return " ".join((s or "").split()).lower()
 
 
-def _resolve_columns(headers: list[str]) -> dict[str, int] | None:
-    slugs = [_slug_header(h) for h in headers]
+def _resolve_columns(headers: list[Any]) -> dict[str, int] | None:
+    slugs = [_slug_header(str(h) if h is not None else "") for h in headers]
     out: dict[str, int] = {}
     for key, aliases in _HEADER_ALIASES.items():
         idx = None
@@ -96,45 +96,75 @@ def _resolve_columns(headers: list[str]) -> dict[str, int] | None:
     return out
 
 
-def _excel_cell_to_str(cell: object) -> str:
-    if cell is None:
-        return ""
-    if isinstance(cell, datetime):
-        return cell.date().strftime("%Y-%m-%d")
-    if isinstance(cell, date):
-        return cell.strftime("%Y-%m-%d")
-    if isinstance(cell, (int, float)) and not isinstance(cell, bool):
-        try:
-            from openpyxl.utils.datetime import from_excel
-
-            return from_excel(cell).date().strftime("%Y-%m-%d")
-        except Exception:
-            s = str(cell).strip()
-            if s.endswith(".0"):
-                s = s[:-2]
-            return s
-    return str(cell).strip()
+def _trim_trailing_blanks_row(row: list[Any]) -> list[Any]:
+    cells = list(row)
+    while cells and (cells[-1] is None or cells[-1] == ""):
+        cells.pop()
+    return cells
 
 
-def _xlsx_bytes_to_rows(raw: bytes) -> list[list[str]]:
+def _xlsx_bytes_to_rows(raw: bytes) -> list[list[Any]]:
+    """Retourne les lignes avec types openpyxl intacts (int, float, datetime…).
+
+    Ne pas convertir les entiers en datesici : un matricule parent saisi comme
+    nombre (ex. 7777) est un serial Excel « date » faux positif (ex. 1921-04-16).
+    La colonne date_naissance est interprétée dans `_coerce_cell_for_import`.
+    """
     from openpyxl import load_workbook
 
     wb = load_workbook(BytesIO(raw), read_only=True, data_only=True)
     try:
         ws = wb.active
-        raw_rows: list[list[str]] = []
+        raw_rows: list[list[Any]] = []
         for row in ws.iter_rows(values_only=True):
-            cells = [_excel_cell_to_str(c) for c in row]
-            while cells and cells[-1] == "":
-                cells.pop()
-            if any(cells):
+            cells = _trim_trailing_blanks_row(list(row))
+            if any(c is not None and c != "" for c in cells):
                 raw_rows.append(cells)
         return raw_rows
     finally:
         wb.close()
 
 
-def _process_enfants_import_rows(db: Session, raw_rows: list[list[str]]) -> dict[str, Any]:
+def _coerce_cell_for_import(val: Any, field: str) -> str:
+    """Normalise une cellule CSV/Excel selon le rôle de la colonne."""
+    if val is None:
+        return ""
+    if field == "matricule_parent":
+        if isinstance(val, float) and not isinstance(val, bool):
+            if val.is_integer():
+                return str(int(val))
+            return str(val).strip()
+        if isinstance(val, int) and not isinstance(val, bool):
+            return str(val)
+        return str(val).strip()
+    if field == "date_naissance":
+        if isinstance(val, datetime):
+            return val.date().strftime("%Y-%m-%d")
+        if isinstance(val, date):
+            return val.strftime("%Y-%m-%d")
+        if isinstance(val, (int, float)) and not isinstance(val, bool):
+            try:
+                from openpyxl.utils.datetime import from_excel
+
+                return from_excel(val).date().strftime("%Y-%m-%d")
+            except Exception:
+                s = str(val).strip()
+                if s.endswith(".0"):
+                    s = s[:-2]
+                return s
+        return str(val).strip()
+    if isinstance(val, datetime):
+        return val.date().strftime("%Y-%m-%d")
+    if isinstance(val, date):
+        return val.strftime("%Y-%m-%d")
+    if isinstance(val, float) and not isinstance(val, bool) and val.is_integer():
+        return str(int(val))
+    if isinstance(val, int) and not isinstance(val, bool):
+        return str(val)
+    return str(val).strip()
+
+
+def _process_enfants_import_rows(db: Session, raw_rows: list[list[Any]]) -> dict[str, Any]:
     if len(raw_rows) < 2:
         return {
             "ok": False,
@@ -158,7 +188,8 @@ def _process_enfants_import_rows(db: Session, raw_rows: list[list[str]]) -> dict
     for ligne_no, parts in enumerate(raw_rows[1:], start=2):
         def cell(slug: str) -> str:
             i = col[slug]
-            return (parts[i].strip() if i < len(parts) else "") or ""
+            raw = parts[i] if i < len(parts) else None
+            return _coerce_cell_for_import(raw, slug) or ""
 
         mat = cell("matricule_parent")
         prenom = cell("prenom")

@@ -757,13 +757,13 @@ export default function ParentDashboard() {
               <Phone className="w-6 h-6 text-accent" />
               Numéro de téléphone obligatoire
             </h2>
-            <p className="text-muted-foreground">Vous devez renseigner votre numéro de téléphone avant de pouvoir inscrire vos enfants et faire vos sélections.</p>
+            <p className="text-muted-foreground">Vous devez renseigner votre numéro de téléphone avant de pouvoir inscrire vos enfants.</p>
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Numéro de téléphone</label>
               <Input
                 value={phoneInput}
                 onChange={(e) => setPhoneInput(e.target.value)}
-                placeholder="Ex: 70 00 00 00"
+                placeholder="Saisissez votre numéro de téléphone"
                 className="h-11 rounded-lg"
               />
             </div>

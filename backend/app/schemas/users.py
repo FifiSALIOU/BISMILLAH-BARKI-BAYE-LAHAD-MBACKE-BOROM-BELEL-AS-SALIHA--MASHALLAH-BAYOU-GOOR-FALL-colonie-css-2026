@@ -19,6 +19,7 @@ class UserOut(BaseModel):
     parent_service: Optional[str] = None
     parent_site_code: Optional[str] = None
     parent_telephone: Optional[str] = None
+    parent_nb_enfants: Optional[int] = None
 
     class Config:
         from_attributes = True
@@ -55,7 +56,8 @@ class UserUpsertIn(BaseModel):
     parent_nom: Optional[str] = Field(default=None, min_length=1, max_length=255)
     parent_service: Optional[str] = Field(default=None, min_length=1, max_length=255)
     parent_site_code: Optional[str] = Field(default=None, min_length=1, max_length=50)
-    parent_telephone: Optional[str] = Field(default=None, min_length=1, max_length=50)
+    # Chaîne vide = effacer le numéro (super admin). Absent / null = ne pas modifier le téléphone.
+    parent_telephone: Optional[str] = Field(default=None, max_length=191)
 
 
 class ResetPasswordIn(BaseModel):
