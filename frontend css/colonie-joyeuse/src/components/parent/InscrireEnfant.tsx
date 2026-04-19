@@ -44,6 +44,9 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
   const [errorMessage, setErrorMessage] = useState('');
   const [successOpen, setSuccessOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  /** Parents sans enfant codifié : après la 1re inscription non biologique, dialogue dédié à la limite (sans mélanger avec le flux standard). */
+  const [nonBioLimiteDialogOpen, setNonBioLimiteDialogOpen] = useState(false);
+  const [nonBioLimiteEnfantLabel, setNonBioLimiteEnfantLabel] = useState('');
   const [showNextPrompt, setShowNextPrompt] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [justificatifFiles, setJustificatifFiles] = useState<File[]>([]);
@@ -192,16 +195,16 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
       return;
     }
 
-    const listeLabel = liste === 'principale' ? 'Liste Principale (Titulaire)' : liste === 'attente_n1' ? "Liste d'Attente N°1 (Suppléant)" : "Liste d'Attente N°2";
-
-    const limitReachedMessage = "Vous avez atteint votre limite d'inscription (1 enfant non biologique autorisé).";
-    setSuccessMessage(
-      nonBiologiqueMode
-        ? `${prenom} ${nom} a été inscrit(e) avec succès dans la ${listeLabel}. ${limitReachedMessage}`
-        : `${prenom} ${nom} a été inscrit(e) avec succès dans la ${listeLabel}.`
-    );
-    setSuccessOpen(true);
-    setShowNextPrompt(!nonBiologiqueMode);
+    if (nonBiologiqueMode) {
+      setNonBioLimiteEnfantLabel(`${prenom.trim()} ${nom.trim()}`);
+      setNonBioLimiteDialogOpen(true);
+    } else {
+      const listeLabel =
+        liste === 'principale' ? 'Liste Principale (Titulaire)' : liste === 'attente_n1' ? "Liste d'Attente N°1 (Suppléant)" : "Liste d'Attente N°2";
+      setSuccessMessage(`${prenom} ${nom} a été inscrit(e) avec succès dans la ${listeLabel}.`);
+      setSuccessOpen(true);
+      setShowNextPrompt(true);
+    }
     resetForm();
   };
 
@@ -435,6 +438,31 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
         </DialogContent>
       </Dialog>
 
+      {/* Uniquement parent sans enfant codifié (nonBiologiqueMode) : une seule inscription non biologique — message de limite dédié après succès API */}
+      <Dialog open={nonBioLimiteDialogOpen} onOpenChange={setNonBioLimiteDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-xl">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center"><AlertTriangle className="w-5 h-5 text-amber-700" /></div>
+              <DialogTitle className="text-foreground">Vous avez atteint la limite</DialogTitle>
+            </div>
+            <DialogDescription className="pt-2 space-y-2 text-left">
+              <p>
+                L&apos;inscription de <strong className="text-foreground">{nonBioLimiteEnfantLabel}</strong> est bien enregistrée (liste d&apos;attente N°2).
+              </p>
+              <p className="text-foreground font-medium">
+                Vous ne pouvez plus inscrire d&apos;autre enfant non biologique : une seule inscription est autorisée lorsque vous n&apos;avez pas d&apos;enfant codifié.
+              </p>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => setNonBioLimiteDialogOpen(false)} className="rounded-lg bg-accent text-white hover:bg-accent/90">
+              Compris
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Confirmation dialog */}
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <DialogContent className="sm:max-w-md rounded-xl">
@@ -448,10 +476,23 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
               <br /><br />
               <strong>Enfant :</strong> {prenom} {nom}<br />
               <strong>Date de naissance :</strong> {dateNaissance ? new Date(dateNaissance).toLocaleDateString('fr-FR') : ''}<br />
-              <strong>Sexe :</strong> {sexe === 'M' ? 'Masculin' : sexe === 'F' ? 'Féminin' : ''}<br />
-              <strong>Lien de parenté :</strong> {LIEN_PARENTE_LABELS[lienParente as LienParenteApi] ?? lienParente}
+              <strong>Sexe :</strong> {sexe === 'M' ? 'Masculin' : sexe === 'F' ? 'Féminin' : ''}
+              {!nonBiologiqueMode && (
+                <>
+                  <br />
+                  <strong>Lien de parenté :</strong> {LIEN_PARENTE_LABELS[lienParente as LienParenteApi] ?? lienParente}
+                </>
+              )}
               <br /><br />
-              <span className="text-destructive font-medium">⚠ Attention : une fois l'inscription enregistrée, vous pourrez corriger les informations depuis votre demande, sans changer votre rang.</span>
+              {nonBiologiqueMode ? (
+                <span className="text-destructive font-medium">
+                  Attention : après confirmation, l&apos;inscription est définitive, vous ne pourrez plus modifier les renseignements saisis depuis cet espace. Vérifiez tout avant de valider.
+                </span>
+              ) : (
+                <span className="text-destructive font-medium">
+                  ⚠ Attention : une fois l&apos;inscription enregistrée, vous pourrez corriger les informations depuis votre demande, sans changer votre rang.
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

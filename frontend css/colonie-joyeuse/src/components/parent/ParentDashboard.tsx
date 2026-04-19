@@ -711,18 +711,6 @@ export default function ParentDashboard() {
   const nonBioUniqueLimitReached = parentQueDesNonBio && nonBioInscriptionsCount >= 1;
   const afficherInscriptionNonBio = !inscriptionsCloturees && parentQueDesNonBio && !nonBioUniqueLimitReached;
 
-  const prevNonBioCountRef = useRef(nonBioInscriptionsCount);
-  useEffect(() => {
-    const prev = prevNonBioCountRef.current;
-    if (parentQueDesNonBio && prev === 0 && nonBioInscriptionsCount >= 1) {
-      toast({
-        title: 'Limite atteinte',
-        description: 'Vous avez atteint votre unique inscription autorisée pour un enfant non biologique.',
-      });
-    }
-    prevNonBioCountRef.current = nonBioInscriptionsCount;
-  }, [parentQueDesNonBio, nonBioInscriptionsCount]);
-
   useEffect(() => {
     if (!demandesParentChargees) return;
     if (inscriptionsCloturees || MAX == null) {
@@ -1066,14 +1054,6 @@ export default function ParentDashboard() {
               Inscrire un autre enfant (non biologique)
             </Button>
           </div>
-        )}
-        {nonBioUniqueLimitReached && (
-          <Alert className="max-w-4xl border-amber-200 bg-amber-50/60">
-            {/* <AlertTitle>Inscription non biologique limitée</AlertTitle> */}
-            <AlertDescription>
-              Vous avez déjà utilisé votre unique inscription autorisée pour un enfant non biologique.
-            </AlertDescription>
-          </Alert>
         )}
       </div>
 
