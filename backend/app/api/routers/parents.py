@@ -407,7 +407,7 @@ def list_inscriptions_transparence(
                 rang_dans_liste=d.rang_dans_liste,
                 date_inscription=when,
                 updated_at=_dt_aware_utc(d.updated_at),
-                is_reinscrit=(d.statut in (DemandeStatut.SOUMISE, DemandeStatut.RETENUE) and d.updated_at is not None),
+                is_reinscrit=bool(d.reinscrit_apres_desistement),
                 statut_demande=d.statut.value,
                 parent_matricule=p.matricule,
                 parent_prenom=p.prenom,
@@ -638,7 +638,7 @@ def _to_demande_out(db: Session, demande: DemandeInscription) -> DemandeOut:
         non_validation_reason=demande.non_validation_reason or None,
         is_selection_finale=(demande.statut == DemandeStatut.RETENUE),
         has_desistement_pending=(demande.desistement is not None and demande.statut != DemandeStatut.DESISTEE),
-        is_reinscrit=(demande.statut in (DemandeStatut.SOUMISE, DemandeStatut.RETENUE) and demande.updated_at is not None),
+        is_reinscrit=bool(demande.reinscrit_apres_desistement),
         rejet_definitif=bool(
             demande.statut == DemandeStatut.NON_VALIDEE and getattr(demande, "rejet_definitif", False)
         ),

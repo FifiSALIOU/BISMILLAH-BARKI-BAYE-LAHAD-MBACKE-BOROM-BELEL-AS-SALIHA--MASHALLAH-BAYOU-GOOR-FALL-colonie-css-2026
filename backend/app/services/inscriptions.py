@@ -720,6 +720,7 @@ def reinscrire_desiste(*, db: Session, user: User, demande_id: int) -> DemandeIn
     else:
         demande.statut = DemandeStatut.SOUMISE
     demande.non_validation_reason = ""
+    demande.reinscrit_apres_desistement = True
     demande.updated_at = datetime.now(timezone.utc)
     db.flush()
     resequence_rangs_pour_liste(db, int(demande.liste_id), demande_reinscrite_id=int(demande.id))

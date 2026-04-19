@@ -142,6 +142,12 @@ class DemandeInscription(Base):
     )
     non_validation_reason: Mapped[str] = mapped_column("motif_rejet", String(191), nullable=False)
     rejet_definitif: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    reinscrit_apres_desistement: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        comment="True uniquement après POST réinscription (désistement validé puis réinscription parent).",
+    )
     justificatif_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     justificatif_nom_fichier: Mapped[str | None] = mapped_column(String(255), nullable=True)
     justificatif_mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
