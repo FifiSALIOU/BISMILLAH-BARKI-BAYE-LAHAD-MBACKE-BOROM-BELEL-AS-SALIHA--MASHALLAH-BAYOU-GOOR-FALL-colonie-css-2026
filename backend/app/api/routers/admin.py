@@ -12,7 +12,17 @@ from sqlalchemy.orm import Session, joinedload
 from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
 from app.models.enums import DemandeStatut, ListeCode, LienParente, Sexe, UserRole
-from app.models.models import DemandeInscription, Desistement, Enfant, Liste, Parent, Service, Site, User
+from app.models.models import (
+    DemandeInscription,
+    Desistement,
+    Enfant,
+    HistoriqueEntry,
+    Liste,
+    Parent,
+    Service,
+    Site,
+    User,
+)
 from app.services.email import send_email, uniq_emails
 from app.services.email_templates import (
     body_selection,
@@ -977,7 +987,12 @@ def stats_summary(
             k = d.liste.code.value
             by_liste_map[k] = by_liste_map.get(k, 0) + 1
 
-    desistements_waiting = db.query(func.count(Desistement.id)).scalar() or 0
+    desistements_waiting = (
+        db.query(func.count(DemandeInscription.id))
+        .filter(DemandeInscription.statut == DemandeStatut.DESISTEE)
+        .scalar()
+        or 0
+    )
 
     # Inscriptions par liste (toutes les demandes liées à la liste) — clés alignées sur le frontend (listeUi).
     inscriptions_rows = (
@@ -1086,6 +1101,54 @@ def _selection_event_time(d: DemandeInscription) -> datetime | None:
     return datetime.combine(d.date_inscription, datetime.min.time(), tzinfo=timezone.utc)
 
 
+def _inscription_event_time(d: DemandeInscription) -> datetime:
+    """Heure réelle pour le journal si `created_at` est renseigné ; sinon date d'inscription à minuit (UTC)."""
+    if d.created_at:
+        t = d.created_at
+        return t if t.tzinfo else t.replace(tzinfo=timezone.utc)
+    return datetime.combine(d.date_inscription, datetime.min.time(), tzinfo=timezone.utc)
+
+
+def _liste_libelle_journal(d: DemandeInscription) -> str:
+    """Libellé liste pour le journal (demandes sans `liste_id` : flux parent avant choix de liste)."""
+    if d.liste is None:
+        return "liste non encore assignée"
+    return d.liste.code.value
+
+
+def _parent_nom_journal(parent: Parent) -> str:
+    label = f"{(parent.prenom or '').strip()} {(parent.nom or '').strip()}".strip()
+    return label or (parent.matricule or "—")
+
+
+def _admin_nom_journal_selection(db: Session, d: DemandeInscription) -> str:
+    """Colonne Utilisateur pour Validation/Refus : `User.name` (saisi côté admin) si retrouvable, sinon repli."""
+    if d.statut == DemandeStatut.RETENUE:
+        uid = d.justificatif_valide_par_user_id
+        if uid is not None:
+            u = db.query(User).filter(User.id == int(uid)).first()
+            if u and (u.name or "").strip():
+                return u.name.strip()
+        return "Administrateur"
+
+    hist = (
+        db.query(HistoriqueEntry)
+        .filter(HistoriqueEntry.demande_id == d.id, HistoriqueEntry.event_type == "REJET")
+        .order_by(HistoriqueEntry.date_action.desc())
+        .first()
+    )
+    if hist and hist.ajoute_par_id is not None:
+        u = db.query(User).filter(User.id == int(hist.ajoute_par_id)).first()
+        if u and (u.name or "").strip():
+            return u.name.strip()
+    uid = d.justificatif_valide_par_user_id
+    if uid is not None:
+        u = db.query(User).filter(User.id == int(uid)).first()
+        if u and (u.name or "").strip():
+            return u.name.strip()
+    return "Administrateur"
+
+
 @router.get("/historique", summary="Historique consolidé (gestionnaire / super admin)")
 def historique_actions(
     limit: int = 200,
@@ -1119,7 +1182,7 @@ def historique_actions(
         db.query(DemandeInscription)
         .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
         .join(Parent, Parent.id == Enfant.parent_id)
-        .join(Liste, Liste.id == DemandeInscription.liste_id)
+        .outerjoin(Liste, Liste.id == DemandeInscription.liste_id)
         .order_by(DemandeInscription.date_inscription.desc())
         .limit(safe_limit)
         .all()
@@ -1132,11 +1195,11 @@ def historique_actions(
 
         _push_event(
             key=f"inscription_{d.id}",
-            when=datetime.combine(d.date_inscription, datetime.min.time(), tzinfo=timezone.utc),
-            utilisateur=parent.matricule,
+            when=_inscription_event_time(d),
+            utilisateur=_parent_nom_journal(parent),
             role_label="Parent",
             action="Inscription",
-            details=f"Inscription de {cible} dans {d.liste.code.value}",
+            details=f"Inscription de {cible} dans {_liste_libelle_journal(d)}",
             cible=cible,
         )
 
@@ -1152,10 +1215,23 @@ def historique_actions(
             _push_event(
                 key=f"selection_{d.id}",
                 when=st,
-                utilisateur="Administrateur",
+                utilisateur=_admin_nom_journal_selection(db, d),
                 role_label="Admin",
                 action=action,
                 details=detail,
+                cible=cible,
+            )
+
+        # Désistement à effet immédiat (plus de ligne `desistements` en attente) : traçabilité alignée sur la demande.
+        if d.statut == DemandeStatut.DESISTEE:
+            when_desist = _selection_event_time(d)
+            _push_event(
+                key=f"desistement_effectue_{d.id}",
+                when=when_desist,
+                utilisateur=_parent_nom_journal(parent),
+                role_label="Parent",
+                action="Désistement enregistré",
+                details=f"Désistement enregistré pour {cible} (effet immédiat).",
                 cible=cible,
             )
 
@@ -1181,7 +1257,7 @@ def historique_actions(
         _push_event(
             key=f"desist_req_{d.id}",
             when=when_ds,
-            utilisateur=parent.matricule,
+            utilisateur=_parent_nom_journal(parent),
             role_label="Parent",
             action="Désistement demandé",
             details=f"Désistement demandé pour {cible}.",

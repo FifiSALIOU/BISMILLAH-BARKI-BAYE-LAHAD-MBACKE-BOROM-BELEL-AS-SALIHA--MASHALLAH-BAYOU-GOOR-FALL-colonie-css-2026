@@ -124,7 +124,7 @@ export default function ListeInscriptions() {
   const generateData = () => {
     const headers = ['Rang', 'Matricule', 'Nom Parent', 'Prénom Parent', 'Service', 'Agence', 'Nom Enfant', 'Prénom Enfant', 'Âge', 'Sexe', 'Statut', 'Liste', 'Inscrit le'];
     const dataRows = filtered.map((e) => {
-      return [e.rang, e.parentMatricule, e.parentNom || '', e.parentPrenom || '', e.parentService || '', e.parentAgence || '', e.enfantNom, e.enfantPrenom, age(e.dateNaissance), e.sexe === 'M' ? 'M' : 'F', e.statut, getListeLabel(e.liste), new Date(e.dateInscription).toLocaleDateString('fr-FR')];
+      return [e.rang, e.parentMatricule, e.parentNom || '', e.parentPrenom || '', e.parentService || '', e.parentAgence || '', e.enfantNom, e.enfantPrenom, `${age(e.dateNaissance)} ans`, e.sexe === 'M' ? 'M' : 'F', e.statut, getListeLabel(e.liste), new Date(e.dateInscription).toLocaleDateString('fr-FR')];
     });
     return { headers, rows: dataRows };
   };
@@ -156,7 +156,7 @@ export default function ListeInscriptions() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Toutes les inscriptions</h1>
-          <p className="text-muted-foreground mt-1">{rows.length} inscription(s) — rang = position dans chaque liste (aligné sur la base de données)</p>
+          <p className="text-muted-foreground mt-1">{rows.length} inscription(s){/* — rang = position dans chaque liste (aligné sur la base de données) */}</p>
         </div>
         <div className="flex gap-2">
           <Button onClick={exportExcel} variant="outline" className="gap-2 rounded-lg">
@@ -187,9 +187,9 @@ export default function ListeInscriptions() {
                 <TableHead className="font-semibold">Prénom Enfant</TableHead>
                 <TableHead className="font-semibold">Nom Enfant</TableHead>
                 <TableHead className="font-semibold">Âge</TableHead>
-                <TableHead className="font-semibold">Sexe</TableHead>
-                <TableHead className="font-semibold">Liste</TableHead>
-                <TableHead className="font-semibold">Statut</TableHead>
+                <TableHead className="font-semibold text-center">Sexe</TableHead>
+                <TableHead className="font-semibold text-center">Liste</TableHead>
+                <TableHead className="font-semibold text-center">Statut</TableHead>
                 <TableHead className="font-semibold">Inscrit le</TableHead>
               </TableRow>
             </TableHeader>
@@ -204,13 +204,13 @@ export default function ListeInscriptions() {
                     <TableCell className="text-sm">{e.parentAgence || '—'}</TableCell>
                     <TableCell>{e.enfantPrenom}</TableCell>
                     <TableCell className="font-medium">{e.enfantNom}</TableCell>
-                    <TableCell>{age(e.dateNaissance)} ans</TableCell>
-                    <TableCell>{e.sexe === 'M' ? 'M' : 'F'}</TableCell>
-                    <TableCell>
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground">{getListeLabel(e.liste)}</span>
+                    <TableCell className="whitespace-nowrap">{age(e.dateNaissance)} ans</TableCell>
+                    <TableCell className="text-center">{e.sexe === 'M' ? 'M' : 'F'}</TableCell>
+                    <TableCell className="text-center">
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground whitespace-nowrap">{getListeLabel(e.liste)}</span>
                     </TableCell>
-                    <TableCell>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${getStatutBadge(e.statut)}`}>{e.statut}</span>
+                    <TableCell className="text-center">
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${getStatutBadge(e.statut)}`}>{e.statut}</span>
                     </TableCell>
                     <TableCell className="tabular-nums text-sm text-muted-foreground">{new Date(e.dateInscription).toLocaleDateString('fr-FR')}</TableCell>
                   </TableRow>

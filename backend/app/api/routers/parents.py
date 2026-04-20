@@ -257,6 +257,7 @@ def creer_inscription_non_biologique_n2(
     db.flush()
 
     rang = _next_rang_for_liste(db, int(target_liste.id))
+    now_utc = datetime.now(timezone.utc)
     demande = DemandeInscription(
         enfant_id=enfant.id,
         liste_id=target_liste.id,
@@ -269,7 +270,9 @@ def creer_inscription_non_biologique_n2(
         justificatif_nom_fichier=nom_fichier,
         justificatif_mime_type=(mime or "")[:100] or None,
         justificatif_taille=taille,
-        justificatif_uploaded_at=datetime.now(timezone.utc),
+        justificatif_uploaded_at=now_utc,
+        created_at=now_utc,
+        updated_at=now_utc,
     )
     db.add(demande)
     db.commit()

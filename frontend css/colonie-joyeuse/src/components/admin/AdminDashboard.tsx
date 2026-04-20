@@ -54,10 +54,10 @@ export default function AdminDashboard() {
   const n2 = statsApi
     ? (ibl?.attente_n2 ?? sbl?.ATTENTE_N2 ?? sbl?.attente_n2 ?? 0)
     : enfants.filter(e => e.liste === 'attente_n2').length;
-  const total = statsApi?.total_demandes ?? enfants.length;
+  const total = principale + n1 + n2;
   const totalParents = statsApi?.total_parents ?? new Set(enfants.map(e => e.parentMatricule)).size;
   const listeFinaleCount = statsApi?.selected_total ?? 0;
-  const desistementsEnAttente = statsApi?.desistements_waiting ?? enfants.filter(e => e.desistement === 'demandé').length;
+  const desistementsEffectifs = statsApi?.desistements_waiting ?? enfants.filter(e => e.desistement === 'validé').length;
 
   const capaciteLabel = settings.capaciteMax !== null ? settings.capaciteMax : '∞';
   const retenuLabel = settings.capaciteMax !== null ? `${listeFinaleCount}/${settings.capaciteMax}` : `${listeFinaleCount} (Non défini)`;
@@ -69,7 +69,7 @@ export default function AdminDashboard() {
     { label: "Liste d'attente N°1", value: n1, icon: Clock, color: 'text-accent', bg: 'bg-accent/10' },
     { label: "Liste d'attente N°2", value: n2, icon: Clock, color: 'text-primary', bg: 'bg-primary/10' },
     { label: 'Retenus (finale)', value: retenuLabel, icon: Award, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-    { label: 'Désistements en attente', value: desistementsEnAttente, icon: HandMetal, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { label: 'Désistés', value: desistementsEffectifs, icon: HandMetal, color: 'text-amber-600', bg: 'bg-amber-50' },
   ];
 
   const donutData = [
@@ -110,7 +110,7 @@ export default function AdminDashboard() {
         {stats.map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * i }} className="bg-card rounded-2xl shadow-card border border-border p-5">
             <div className="flex items-start justify-between mb-4">
-              <p className="text-sm font-medium text-muted-foreground leading-tight max-w-[60%]">{s.label}</p>
+              <p className="text-sm font-medium text-muted-foreground leading-tight pr-2 max-w-[calc(100%-3rem)]">{s.label}</p>
               <div className={`w-10 h-10 rounded-full ${s.bg} flex items-center justify-center shrink-0`}><s.icon className={`w-5 h-5 ${s.color}`} /></div>
             </div>
             <span className="text-xl font-bold text-foreground">{s.value}</span>

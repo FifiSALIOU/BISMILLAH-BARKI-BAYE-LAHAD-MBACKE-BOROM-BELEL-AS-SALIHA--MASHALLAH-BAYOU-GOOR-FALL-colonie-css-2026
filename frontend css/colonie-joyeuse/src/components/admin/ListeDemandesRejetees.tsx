@@ -2,7 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, RotateCcw, Ban, AlertTriangle } from 'lucide-react';
+import { Search, RotateCcw, Ban, AlertTriangle, Eye, ChevronDown } from 'lucide-react';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,7 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { apiRequest } from '@/lib/api';
-import { listeApiToUi, statutLabelFromListeUi, type ListeUi } from '@/lib/listeCodes';
+import { listeApiToUi } from '@/lib/listeCodes';
 import { toast } from '@/hooks/use-toast';
 import type { Enfant } from '@/data/mockData';
 
@@ -96,6 +97,52 @@ const calculateAge = (dateNaissance: string): number => {
   return age;
 };
 
+function formatDateNaissanceJjMmAaaa(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const raw = iso.includes('T') ? iso.split('T')[0] : iso.trim();
+  const parts = raw.split('-');
+  if (parts.length === 3 && parts[0].length === 4) {
+    const [y, m, d] = parts;
+    return `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`;
+  }
+  return '—';
+}
+
+function formatDateRefusJjMmAaaa(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return '—';
+  const d = String(dt.getDate()).padStart(2, '0');
+  const m = String(dt.getMonth() + 1).padStart(2, '0');
+  const y = dt.getFullYear();
+  return `${d}/${m}/${y}`;
+}
+
+/** Heure locale (HH:MM) à partir du même horodatage que la date du refus (`updated_at`). */
+function formatHeureRefusHhMm(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const dt = new Date(iso);
+  if (Number.isNaN(dt.getTime())) return '—';
+  const h = String(dt.getHours()).padStart(2, '0');
+  const min = String(dt.getMinutes()).padStart(2, '0');
+  return `${h}:${min}`;
+}
+
+function formatSexeLabel(s: string): string {
+  if (s === 'M') return 'Masculin';
+  if (s === 'F') return 'Féminin';
+  return s || '—';
+}
+
+function refusDefinitifField(label: string, value: React.ReactNode) {
+  return (
+    <div className="min-w-0">
+      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mt-0.5 text-sm text-foreground break-words">{value ?? '—'}</p>
+    </div>
+  );
+}
+
 export default function ListeDemandesRejetees() {
   const { token } = useAuth();
   const [enAttente, setEnAttente] = useState<RejetApiRow[]>([]);
@@ -109,7 +156,7 @@ export default function ListeDemandesRejetees() {
       setEnAttente(res?.en_attente_correction ?? []);
       setDefinitifs(res?.refus_definitifs ?? []);
     } catch {
-      toast({ title: 'Erreur', description: 'Impossible de charger les demandes rejetées.', variant: 'destructive' });
+      toast({ title: 'Erreur', description: 'Impossible de charger les demandes refusées.', variant: 'destructive' });
     }
   }, [token]);
 
@@ -134,6 +181,7 @@ export default function ListeDemandesRejetees() {
 
   const [corrigerRow, setCorrigerRow] = useState<RejetApiRow | null>(null);
   const [refusDefRow, setRefusDefRow] = useState<RejetApiRow | null>(null);
+  const [detailRefusRow, setDetailRefusRow] = useState<RejetApiRow | null>(null);
   const [saving, setSaving] = useState(false);
 
   const [formPrenom, setFormPrenom] = useState('');
@@ -287,57 +335,108 @@ export default function ListeDemandesRejetees() {
   );
 
   const renderTableDefinitifs = (rows: RejetApiRow[]) => (
-    <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
-      <Table>
-        <TableHeader>
-          <TableRow className="bg-muted/50">
-            <TableHead className="font-semibold">Liste d&apos;origine</TableHead>
-            <TableHead className="font-semibold">Matricule</TableHead>
-            <TableHead className="font-semibold">Parent</TableHead>
-            <TableHead className="font-semibold">Enfant</TableHead>
-            <TableHead className="font-semibold">Âge</TableHead>
-            <TableHead className="font-semibold">Motif du refus</TableHead>
-            <TableHead className="font-semibold">Statut liste</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
-                Aucune entrée
-              </TableCell>
-            </TableRow>
-          ) : (
-            rows.map((r) => {
-              const lu = listeApiToUi(r.liste) as ListeUi;
-              const dn = r.enfant.date_naissance?.includes('T')
-                ? r.enfant.date_naissance.split('T')[0]
-                : r.enfant.date_naissance || '';
-              return (
-                <TableRow key={r.demande_id}>
-                  <TableCell className="text-sm">{getListeLabelFromApi(r.liste)}</TableCell>
-                  <TableCell className="font-mono text-sm">{r.parent_matricule}</TableCell>
-                  <TableCell className="text-sm">
-                    {r.parent_prenom} {r.parent_nom}
-                  </TableCell>
-                  <TableCell className="text-sm font-medium">
-                    {r.enfant.prenom} {r.enfant.nom}
-                  </TableCell>
-                  <TableCell>{dn ? `${calculateAge(dn)} ans` : '—'}</TableCell>
-                  <TableCell className="text-sm text-destructive max-w-[220px]">
-                    {(r.non_validation_reason || '').trim() || '—'}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground">
-                      {statutLabelFromListeUi(lu)}
-                    </span>
-                  </TableCell>
-                </TableRow>
-              );
-            })
-          )}
-        </TableBody>
-      </Table>
+    <div className="space-y-3">
+      {rows.length === 0 ? (
+        <div className="rounded-xl border border-border bg-card shadow-card px-4 py-12 text-center text-sm text-muted-foreground">
+          Aucune entrée
+        </div>
+      ) : (
+        rows.map((r) => {
+          const motif = (r.non_validation_reason || '').trim() || '—';
+          const heureRefus = formatHeureRefusHhMm(r.updated_at);
+          return (
+            <Collapsible
+              key={r.demande_id}
+              defaultOpen={false}
+              className="group rounded-xl border border-border bg-card shadow-card overflow-hidden"
+            >
+              <div className="border-b border-border bg-muted/30 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <p className="text-sm font-semibold text-foreground">
+                  {r.enfant.prenom} {r.enfant.nom}
+                  <span className="font-normal text-muted-foreground">
+                    {' '}
+                    — {getListeLabelFromApi(r.liste)}
+                  </span>
+                </p>
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  Refusé le {formatDateRefusJjMmAaaa(r.updated_at)}
+                  {heureRefus !== '—' ? ` à ${heureRefus}` : ''}
+                </p>
+              </div>
+
+              <div className="px-4 pt-3 pb-2 space-y-3 group-data-[state=open]:hidden">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-2 text-sm">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Matricule</p>
+                    <p className="mt-0.5 font-mono tabular-nums">{r.parent_matricule}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Agence</p>
+                    <p className="mt-0.5 break-words">{(r.parent_site || '').trim() || '—'}</p>
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Téléphone</p>
+                    <p className="mt-0.5 tabular-nums">{(r.parent_telephone || '').trim() || '—'}</p>
+                  </div>
+                  <div className="min-w-0 sm:col-span-1">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Parent</p>
+                    <p className="mt-0.5 break-words">
+                      {r.parent_prenom} {r.parent_nom}
+                    </p>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-destructive/25 bg-destructive/[0.06] px-3 py-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-destructive">Motif du refus</p>
+                  <p className="mt-1 text-sm text-destructive leading-snug line-clamp-2 break-words">{motif}</p>
+                </div>
+              </div>
+
+              <CollapsibleContent className="px-4 pb-2 overflow-hidden">
+                <div className="pt-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                  {refusDefinitifField('Matricule', <span className="font-mono">{r.parent_matricule}</span>)}
+                  {refusDefinitifField('Nom parent', r.parent_nom || '—')}
+                  {refusDefinitifField('Prénom Parent', r.parent_prenom || '—')}
+                  {refusDefinitifField('Agence', (r.parent_site || '').trim() || '—')}
+                  {refusDefinitifField('Service', (r.parent_service || '').trim() || '—')}
+                  {refusDefinitifField('Téléphone', (r.parent_telephone || '').trim() || '—')}
+                  {refusDefinitifField('Prénom Enfant', r.enfant.prenom)}
+                  {refusDefinitifField('Nom Enfant', r.enfant.nom)}
+                  {refusDefinitifField('Date de naissance', formatDateNaissanceJjMmAaaa(r.enfant.date_naissance))}
+                  {refusDefinitifField('Sexe', formatSexeLabel(r.enfant.sexe))}
+                  {refusDefinitifField("Liste d'origine", getListeLabelFromApi(r.liste))}
+                </div>
+                <div className="mt-3 rounded-lg border border-destructive/25 bg-destructive/[0.06] px-3 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-destructive">Motif du refus</p>
+                  <p className="mt-1.5 text-sm text-destructive leading-relaxed break-words">{motif}</p>
+                </div>
+              </CollapsibleContent>
+
+              <div className="px-4 pb-4 flex flex-wrap items-center justify-end gap-2">
+                <CollapsibleTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" className="gap-1.5 rounded-lg h-9 text-xs">
+                    <ChevronDown
+                      className="w-3.5 h-3.5 shrink-0 transition-transform duration-200 group-data-[state=open]:rotate-180"
+                      aria-hidden
+                    />
+                    <span className="group-data-[state=open]:hidden">Fiche complète</span>
+                    <span className="hidden group-data-[state=open]:inline">Replier</span>
+                  </Button>
+                </CollapsibleTrigger>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 rounded-lg h-9 text-xs"
+                  onClick={() => setDetailRefusRow(r)}
+                >
+                  <Eye className="w-3.5 h-3.5" aria-hidden />
+                  Voir détails
+                </Button>
+              </div>
+            </Collapsible>
+          );
+        })
+      )}
     </div>
   );
 
@@ -348,9 +447,10 @@ export default function ListeDemandesRejetees() {
           <Ban className="w-5 h-5 text-destructive" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Demandes rejetées</h1>
+          <h1 className="text-2xl font-bold text-foreground">Demandes refusées</h1>
           <p className="text-muted-foreground mt-1">
-            {enAttente.length} demande(s) en attente de correction — {definitifs.length} refus définitif(s)
+            {/* {enAttente.length} demande(s) en attente de correction — */}
+            {definitifs.length} refus définitif(s)
           </p>
         </div>
       </motion.div>
@@ -365,6 +465,7 @@ export default function ListeDemandesRejetees() {
         />
       </div>
 
+      {/*
       <section className="space-y-3">
         <h2 className="text-lg font-semibold text-foreground">Demandes en attente de correction</h2>
         <p className="text-sm text-muted-foreground">
@@ -372,10 +473,13 @@ export default function ListeDemandesRejetees() {
         </p>
         {renderTableAttenteCorrection(attF)}
       </section>
+      */}
 
       <section className="space-y-3">
+        {/*
         <h2 className="text-lg font-semibold text-foreground">Refus définitifs</h2>
         <p className="text-sm text-muted-foreground">Demandes closes — plus aucune action pour le parent ni pour l&apos;administration.</p>
+        */}
         {renderTableDefinitifs(defF)}
       </section>
 
@@ -511,6 +615,86 @@ export default function ListeDemandesRejetees() {
             </Button>
             <Button variant="destructive" onClick={() => void submitRefusDef()} disabled={saving}>
               Confirmer le refus définitif
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!detailRefusRow} onOpenChange={(o) => !o && setDetailRefusRow(null)}>
+        <DialogContent className="sm:max-w-lg rounded-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Eye className="w-5 h-5" aria-hidden />
+              Détails — refus définitif
+            </DialogTitle>
+            <DialogDescription>Consultation des informations enregistrées (aucune modification).</DialogDescription>
+          </DialogHeader>
+          {detailRefusRow && (
+            <div className="space-y-4 text-sm">
+              <p className="text-xs text-muted-foreground">Demande n° {detailRefusRow.demande_id}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Matricule</p>
+                  <p className="font-mono mt-0.5">{detailRefusRow.parent_matricule}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Téléphone</p>
+                  <p className="mt-0.5">{(detailRefusRow.parent_telephone || '').trim() || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Nom parent</p>
+                  <p className="mt-0.5">{detailRefusRow.parent_nom || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Prénom Parent</p>
+                  <p className="mt-0.5">{detailRefusRow.parent_prenom || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Agence</p>
+                  <p className="mt-0.5">{(detailRefusRow.parent_site || '').trim() || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Service</p>
+                  <p className="mt-0.5">{(detailRefusRow.parent_service || '').trim() || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Prénom Enfant</p>
+                  <p className="mt-0.5 font-medium">{detailRefusRow.enfant.prenom}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Nom Enfant</p>
+                  <p className="mt-0.5">{detailRefusRow.enfant.nom}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Date de naissance</p>
+                  <p className="mt-0.5 tabular-nums">{formatDateNaissanceJjMmAaaa(detailRefusRow.enfant.date_naissance)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Sexe</p>
+                  <p className="mt-0.5">{formatSexeLabel(detailRefusRow.enfant.sexe)}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-medium text-muted-foreground">Liste d&apos;origine</p>
+                  <p className="mt-0.5">{getListeLabelFromApi(detailRefusRow.liste)}</p>
+                </div>
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-medium text-muted-foreground">Motif du refus</p>
+                  <p className="mt-0.5 text-destructive">{(detailRefusRow.non_validation_reason || '').trim() || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Date du refus</p>
+                  <p className="mt-0.5 tabular-nums">{formatDateRefusJjMmAaaa(detailRefusRow.updated_at)}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-muted-foreground">Heure du refus</p>
+                  <p className="mt-0.5 tabular-nums">{formatHeureRefusHhMm(detailRefusRow.updated_at)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setDetailRefusRow(null)}>
+              Fermer
             </Button>
           </DialogFooter>
         </DialogContent>

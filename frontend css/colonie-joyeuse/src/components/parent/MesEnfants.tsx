@@ -159,19 +159,15 @@ export default function MesEnfants() {
                       </span>
                     </div>
                     */}
-                    {/* Rang masqué à l’affichage seulement si désistement (réaffiche après réinscription). */}
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <Hash className="w-3 h-3 text-muted-foreground" />
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {enfant.desistement ? (
-                          getListeLabel(enfant.liste)
-                        ) : (
-                          <>
-                            Rang <strong className="text-foreground">{rang}</strong> — {getListeLabel(enfant.liste)}
-                          </>
-                        )}
-                      </span>
-                    </div>
+                    {/* Rang/Liste masqués si désistement (réaffichés après réinscription). */}
+                    {!enfant.desistement && !enfant.rejetDefinitif && (
+                      <div className="flex items-center gap-1.5 mt-1">
+                        <Hash className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-xs font-medium text-muted-foreground">
+                          Rang <strong className="text-foreground">{rang}</strong> — {getListeLabel(enfant.liste)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="flex flex-col items-end gap-2">
@@ -189,10 +185,19 @@ export default function MesEnfants() {
                   )}
                   */}
 
-                  {enfant.validation === 'refusé' && (
+                  {enfant.validation === 'refusé' && enfant.rejetDefinitif && (
+                    <div className="w-full max-w-md rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs text-destructive space-y-1.5 sm:ml-auto">
+                      <p className="font-semibold leading-tight">Refus définitif</p>
+                      <p className="leading-snug break-words">
+                        Motif : {enfant.motifRefus?.trim() || '—'}
+                      </p>
+                      <p className="font-medium leading-tight">Aucune action possible</p>
+                    </div>
+                  )}
+                  {enfant.validation === 'refusé' && !enfant.rejetDefinitif && (
                     <span className="text-xs font-medium px-3 py-1 rounded-lg bg-destructive/10 text-destructive border border-destructive/20 flex items-center gap-1">
-                      <XCircle className="w-3 h-3" /> Refusé — {enfant.motifRefus}
-                      {enfant.rejetDefinitif ? ' (définitif)' : ''}
+                      <XCircle className="w-3 h-3 shrink-0" aria-hidden />
+                      Refusé — {enfant.motifRefus?.trim() || '—'}
                     </span>
                   )}
 
@@ -212,7 +217,7 @@ export default function MesEnfants() {
                     )}
 
                     {!enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && (
-                      <Button variant="outline" size="sm" onClick={() => handleDesistement(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
+                      <Button variant="outline" size="sm" onClick={() => handleDesistement(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive hover:text-white hover:border-destructive">
                         <HandMetal className="w-3 h-3" />Désistement
                       </Button>
                     )}
@@ -260,9 +265,12 @@ export default function MesEnfants() {
             </div>
             <DialogDescription asChild>
               <div className="pt-2 space-y-3 text-sm text-muted-foreground">
-                <p>Vous êtes sur le point de demander le désistement de <strong className="text-foreground">{desistementName}</strong>.</p>
-                <p>Cela signifie que vous ne souhaitez plus que cet enfant participe à la Colonie de Vacances 2026. Cette demande sera envoyée à l'administration pour validation.</p>
-                <p>Vous pourrez annuler cette demande tant que le gestionnaire ne l'a pas encore validée.</p>
+                <p>Vous êtes sur le point de désister <strong className="text-foreground">{desistementName}</strong>.</p>
+                <p>
+                  Cela signifie que vous ne souhaitez plus que cet enfant participe à la Colonie de Vacances 2026.
+                  {/* Cette demande sera envoyée à l'administration pour validation. */}
+                </p>
+                {/* <p>Vous pourrez annuler cette demande tant que le gestionnaire ne l'a pas encore validée.</p> */}
                 {isTitulaireDesistement && enfantN1 && !inscriptionsCloturees && (
                   <p className="text-foreground font-medium">
                     💡 Avant de confirmer, souhaitez-vous définir <strong>{enfantN1.prenom} {enfantN1.nom}</strong> (actuellement Suppléant N1) comme nouveau Titulaire ? Cliquez sur le bouton ci-dessous pour effectuer ce changement avant le désistement.
@@ -274,8 +282,8 @@ export default function MesEnfants() {
           <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
             <Button variant="outline" onClick={() => setDesistementOpen(false)} className="rounded-lg">Annuler</Button>
             {isTitulaireDesistement && enfantN1 && !inscriptionsCloturees && (
-              <Button onClick={handleSwapAndDesist} variant="outline" className="rounded-lg gap-1 text-accent border-accent/30 hover:bg-accent/10 whitespace-normal text-left">
-                <ArrowUpDown className="w-3 h-3 shrink-0" />Promouvoir {enfantN1.prenom} titulaire
+              <Button onClick={handleSwapAndDesist} variant="outline" className="rounded-lg gap-1 text-accent border-accent/30 hover:bg-accent hover:text-white hover:border-accent whitespace-normal text-left">
+                <ArrowUpDown className="w-3 h-3 shrink-0" />Promouvoir en titulaire
               </Button>
             )}
             <Button onClick={confirmDesistement} className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 whitespace-nowrap">Confirmer le désistement</Button>
@@ -310,8 +318,8 @@ export default function MesEnfants() {
             </div>
             <DialogDescription className="pt-2">
               Vous souhaitez réinscrire <strong>{reinscireName}</strong> après son désistement.
-              <br /><br /><strong>Important :</strong> L'enfant sera réintégré dans sa liste d'origine mais ne retrouvera pas son ancien rang. Il sera placé en fin de liste en respectant l'ordre d'arrivée (nouvelle date d'inscription).
-              <br /><br />La demande devra à nouveau être validée par le gestionnaire.
+              <br /><br /><strong>Important :</strong> L'enfant sera réintégré dans sa liste d'origine mais ne retrouvera pas son ancien rang. Il sera placé en fin de liste en respectant l'ordre d'arrivée{/* (nouvelle date d'inscription) */}.
+              {/* <br /><br />La demande devra à nouveau être validée par le gestionnaire. */}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

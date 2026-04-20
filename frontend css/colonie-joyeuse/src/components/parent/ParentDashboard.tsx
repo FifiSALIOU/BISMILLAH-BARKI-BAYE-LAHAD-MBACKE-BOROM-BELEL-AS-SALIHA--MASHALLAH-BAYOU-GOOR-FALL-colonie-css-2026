@@ -119,6 +119,7 @@ export default function ParentDashboard() {
     setListeFinaleApiEnfants([]);
     setListeFinaleApiParents([]);
     setDemandesParentChargees(false);
+    setLimiteMaxDejaAtteinte(false);
     prevPlacesListesPourLimiteRef.current = null;
   }, [parent?.matricule, token]);
 
@@ -160,8 +161,12 @@ export default function ParentDashboard() {
   const [phoneSaving, setPhoneSaving] = useState(false);
   const [ordreRolesDialogOpen, setOrdreRolesDialogOpen] = useState(false);
   const [ordreRolesDialogText, setOrdreRolesDialogText] = useState('');
+  /** Affichage uniquement : mémorise si la limite max a déjà été atteinte. */
+  const [limiteMaxDejaAtteinte, setLimiteMaxDejaAtteinte] = useState(false);
   /** Évite un pop-up au premier chargement ; réinitialisé avec le compte parent (matricule / token). */
   const prevPlacesListesPourLimiteRef = useRef<number | null>(null);
+  /** Empêche l'ouverture de "Limite atteinte" juste après une réinscription. */
+  const skipLimitePopupOnceRef = useRef(false);
   const [limiteRolesSaisonDialogOpen, setLimiteRolesSaisonDialogOpen] = useState(false);
 
   useEffect(() => {
@@ -311,7 +316,7 @@ export default function ParentDashboard() {
       e.lienParente !== 'Autre' &&
       e.statut !== 'Titulaire');
 
-  const capListesTitulaireN1Atteint = MAX != null && placesListesParentSaison >= MAX;
+  const capListesTitulaireN1Atteint = MAX != null && (placesListesParentSaison >= MAX || limiteMaxDejaAtteinte);
   const actionsTitulaireN1BloqueesPourCarte = (e: Enfant) =>
     capListesTitulaireN1Atteint && isNonInscrit(e) && e.lienParente !== 'Autre';
   /** Biologique déjà affecté à la liste N°2 (vraie inscription N2) : masquer Titulaire / N1 / N2, garder désistement. Ne concerne pas « Autre » ni « non inscrit ». */
@@ -416,6 +421,7 @@ export default function ParentDashboard() {
     if (!token) return;
     try {
       await apiRequest(`/parent/desistement/${Number(reinscrireId)}/reinscrire`, { method: 'POST', token });
+      skipLimitePopupOnceRef.current = true;
       await loadAll();
       addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Réinscription', details: `A réinscrit ${reinscireName} après désistement`, cible: reinscireName });
     } catch (err) {
@@ -582,7 +588,14 @@ export default function ParentDashboard() {
   // Validation badge
   const getValidationBadge = (enfant: typeof enfants[0]) => {
     if (enfant.validation === 'validé') return <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">✅ Informations validées</span>;
-    if (enfant.validation === 'refusé') return <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-destructive/10 text-destructive border border-destructive/20">❌ Informations non validées — {enfant.motifRefus}</span>;
+    if (enfant.validation === 'refusé') {
+      if (enfant.rejetDefinitif) return null;
+      return (
+        <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-destructive/10 text-destructive border border-destructive/20">
+          Refusé — {enfant.motifRefus?.trim() || '—'}
+        </span>
+      );
+    }
     /* Soumise sans refus : plus de badge « attente de validation ». Ancien rendu conservé en commentaire :
     return <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">⏳ Informations en attente de validation</span>;
     */
@@ -591,7 +604,7 @@ export default function ParentDashboard() {
 
   // Card click -> open corresponding tab and highlight (enfants déjà sur une liste dans les tableaux transparence)
   const handleCardClick = (enfant: typeof enfants[0]) => {
-    if (isNonInscrit(enfant)) return;
+    if (isNonInscrit(enfant) || !!enfant.desistement || enfant.rejetDefinitif) return;
     setActiveTab(getListeTabKey(enfant.liste));
     setHighlightedEnfantId(enfant.id);
     setTimeout(() => setHighlightedEnfantId(null), 3000);
@@ -712,19 +725,29 @@ export default function ParentDashboard() {
   const afficherInscriptionNonBio = !inscriptionsCloturees && parentQueDesNonBio && !nonBioUniqueLimitReached;
 
   useEffect(() => {
+    if (!demandesParentChargees || MAX == null) return;
+    if (placesListesParentSaison >= MAX) {
+      setLimiteMaxDejaAtteinte(true);
+    }
+  }, [demandesParentChargees, MAX, placesListesParentSaison]);
+
+  useEffect(() => {
     if (!demandesParentChargees) return;
     if (inscriptionsCloturees || MAX == null) {
       prevPlacesListesPourLimiteRef.current = placesListesParentSaison;
+      skipLimitePopupOnceRef.current = false;
       return;
     }
     const prev = prevPlacesListesPourLimiteRef.current;
     if (prev === null) {
       prevPlacesListesPourLimiteRef.current = placesListesParentSaison;
+      skipLimitePopupOnceRef.current = false;
       return;
     }
-    if (prev < MAX && placesListesParentSaison >= MAX) {
+    if (prev < MAX && placesListesParentSaison >= MAX && !skipLimitePopupOnceRef.current) {
       setLimiteRolesSaisonDialogOpen(true);
     }
+    skipLimitePopupOnceRef.current = false;
     prevPlacesListesPourLimiteRef.current = placesListesParentSaison;
   }, [demandesParentChargees, inscriptionsCloturees, MAX, placesListesParentSaison]);
 
@@ -887,7 +910,7 @@ export default function ParentDashboard() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 + 0.1 * i }}
               className={`w-full rounded-xl border border-border bg-card transition-shadow shadow-card ${
-                isNonInscrit(enfant) ? 'cursor-default' : 'cursor-pointer hover:shadow-md'
+                isNonInscrit(enfant) || enfant.rejetDefinitif ? 'cursor-default' : 'cursor-pointer hover:shadow-md'
               } ${actionsTitulaireN1BloqueesPourCarte(enfant) ? 'opacity-60 border-dashed' : ''}`}
               onClick={() => handleCardClick(enfant)}
             >
@@ -959,7 +982,7 @@ export default function ParentDashboard() {
                         enfant.lienParente !== 'Autre' &&
                         !isNonInscrit(enfant))
                     ) && !enfant.desistement && enfant.validation !== 'refusé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi) && (
-                      <Button variant="outline" size="sm" onClick={() => handleDesistement(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive/10">
+                      <Button variant="outline" size="sm" onClick={() => handleDesistement(enfant.id, `${enfant.prenom} ${enfant.nom}`)} className="rounded-lg gap-1 text-xs text-destructive border-destructive/30 hover:bg-destructive hover:text-white hover:border-destructive">
                         <HandMetal className="w-3 h-3" />Désistement
                       </Button>
                     )}
@@ -995,17 +1018,13 @@ export default function ParentDashboard() {
                   {/* Afficher Rang/Liste après choix parent ; et aussi pour enfant non biologique N2. */}
                   {(enfant.statut === 'Titulaire' || (hasTitulaire && hasSuppleantN1) || (enfant.lienParente === 'Autre' && enfant.liste === 'attente_n2')) &&
                     !isNonInscrit(enfant) &&
+                    !enfant.desistement &&
+                    !enfant.rejetDefinitif &&
                     !(enfant.desistement && enfant.lienParente === 'Autre' && enfant.liste === 'attente_n2') && (
                     <div className="flex items-center gap-1.5">
                       <Hash className="w-3 h-3 text-muted-foreground" />
                       <span className="text-xs font-medium text-muted-foreground">
-                        {enfant.desistement ? (
-                          getListeLabel(enfant.liste)
-                        ) : (
-                          <>
-                            Rang <strong className="text-foreground">{getRangDansListeLocal(enfant.id)}</strong> — {getListeLabel(enfant.liste)}
-                          </>
-                        )}
+                        Rang <strong className="text-foreground">{getRangDansListeLocal(enfant.id)}</strong> — {getListeLabel(enfant.liste)}
                       </span>
                     </div>
                   )}
@@ -1018,10 +1037,14 @@ export default function ParentDashboard() {
 
                   {/* Validation badge (rien si soumise sans refus) */}
                   {getValidationBadge(enfant)}
-                  {enfant.rejetDefinitif && (
-                    <span className="inline-block px-2 py-0.5 rounded-md text-xs font-semibold bg-destructive/15 text-destructive border border-destructive/25">
-                      Refus définitif — aucune action possible
-                    </span>
+                  {enfant.validation === 'refusé' && enfant.rejetDefinitif && (
+                    <div className="inline-block rounded-md border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs text-destructive space-y-1.5 max-w-md">
+                      <p className="font-semibold leading-tight">Refus définitif</p>
+                      <p className="leading-snug break-words">
+                        Motif : {enfant.motifRefus?.trim() || '—'}
+                      </p>
+                      <p className="font-medium leading-tight">Aucune action possible</p>
+                    </div>
                   )}
 
                   {/* Désistement badges */}
@@ -1204,9 +1227,12 @@ export default function ParentDashboard() {
             </div>
             <DialogDescription asChild>
               <div className="pt-2 space-y-3 text-sm text-muted-foreground">
-                <p>Vous êtes sur le point de demander le désistement de <strong className="text-foreground">{desistementName}</strong>.</p>
-                <p>Cela signifie que vous ne souhaitez plus que cet enfant participe à la Colonie de Vacances 2026. Cette demande sera envoyée à l'administration pour validation.</p>
-                <p>Vous pourrez annuler cette demande tant que le gestionnaire ne l'a pas encore validée.</p>
+                <p>Vous êtes sur le point de désister <strong className="text-foreground">{desistementName}</strong>.</p>
+                <p>
+                  Cela signifie que vous ne souhaitez plus que cet enfant participe à la Colonie de Vacances 2026.
+                  {/* Cette demande sera envoyée à l'administration pour validation. */}
+                </p>
+                {/* <p>Vous pourrez annuler cette demande tant que le gestionnaire ne l'a pas encore validée.</p> */}
                 {isTitulaireDesistement && enfantN1 && !inscriptionsCloturees && (
                   <p className="text-foreground font-medium">
                     💡 Avant de confirmer, souhaitez-vous définir <strong>{enfantN1.prenom} {enfantN1.nom}</strong> (actuellement Suppléant N1) comme nouveau Titulaire ? Cliquez sur le bouton ci-dessous pour effectuer ce changement avant le désistement.
@@ -1218,8 +1244,8 @@ export default function ParentDashboard() {
           <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
             <Button variant="outline" onClick={() => setDesistementOpen(false)} className="rounded-lg">Annuler</Button>
             {isTitulaireDesistement && enfantN1 && !inscriptionsCloturees && (
-              <Button onClick={handleSwapAndDesist} variant="outline" className="rounded-lg gap-1 text-accent border-accent/30 hover:bg-accent/10 whitespace-normal text-left">
-                <ArrowUpDown className="w-3 h-3 shrink-0" />Promouvoir {enfantN1.prenom} titulaire
+              <Button onClick={handleSwapAndDesist} variant="outline" className="rounded-lg gap-1 text-accent border-accent/30 hover:bg-accent hover:text-white hover:border-accent whitespace-normal text-left">
+                <ArrowUpDown className="w-3 h-3 shrink-0" />Promouvoir en titulaire
               </Button>
             )}
             <Button onClick={confirmDesistement} className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 whitespace-nowrap">Confirmer le désistement</Button>
@@ -1299,8 +1325,8 @@ export default function ParentDashboard() {
             </div>
             <DialogDescription className="pt-2">
               Vous souhaitez réinscrire <strong>{reinscireName}</strong> après son désistement.
-              <br /><br /><strong>Important :</strong> L'enfant sera réintégré dans sa liste d'origine mais ne retrouvera pas son ancien rang. Il sera placé en fin de liste en respectant l'ordre d'arrivée (nouvelle date d'inscription).
-              <br /><br />La demande devra à nouveau être validée par le gestionnaire.
+              <br /><br /><strong>Important :</strong> L'enfant sera réintégré dans sa liste d'origine mais ne retrouvera pas son ancien rang. Il sera placé en fin de liste en respectant l'ordre d'arrivée{/* (nouvelle date d'inscription) */}.
+              {/* <br /><br />La demande devra à nouveau être validée par le gestionnaire. */}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

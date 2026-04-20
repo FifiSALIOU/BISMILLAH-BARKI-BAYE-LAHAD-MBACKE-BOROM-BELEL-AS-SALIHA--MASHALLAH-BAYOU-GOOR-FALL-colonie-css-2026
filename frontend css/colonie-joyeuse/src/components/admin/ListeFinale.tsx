@@ -429,10 +429,12 @@ export default function ListeFinale() {
         </div>
       </motion.div>
 
-      {/* Info about auto-generation */}
+      {/*
+      Info about auto-generation
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
         <strong>ℹ️ Liste automatique :</strong> Après la <strong>clôture des inscriptions</strong>, l&apos;ordre est : <strong>Liste Principale</strong> (tous les rangs 1, 2…), puis <strong>Liste N°1</strong>, puis <strong>Liste N°2</strong>, en suivant le <strong>rang dans chaque liste</strong> (comme à l&apos;écran « Gestion des listes »), pas la seule date d&apos;inscription — celle-ci peut changer après transfert ou réinscription. Les désistements validés sont exclus ; les places libres sont comblées selon cet ordre jusqu&apos;à la capacité.
       </motion.div>
+      */}
 
       {listeFinaleValideeDefinitive && (
         <div className="bg-slate-100 border border-slate-300 rounded-lg p-3 text-sm text-slate-800">
@@ -440,11 +442,13 @@ export default function ListeFinale() {
         </div>
       )}
 
+      {/*
       {!inscriptionsCloturees && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
           Aucun enfant n&apos;apparaît ici tant que les inscriptions sont ouvertes. Après la date de fin configurée, la liste des retenus est calculée automatiquement (priorité Principale, puis N°1, puis N°2, dans la limite des places). Vous pouvez <strong>valider définitivement</strong> dès la clôture. Le bouton <strong>Générer la liste finale</strong> est optionnel (confirmation d&apos;étape).
         </div>
       )}
+      */}
 
       {/* Progress */}
       {inscriptionsCloturees && settings.capaciteMax !== null && (

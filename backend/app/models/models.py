@@ -70,7 +70,7 @@ class Parent(Base):
     prenom: Mapped[str] = mapped_column(String(191), nullable=False)
     nom: Mapped[str] = mapped_column(String(191), nullable=False)
     email: Mapped[str | None] = mapped_column(String(191), nullable=True)
-    telephone: Mapped[str] = mapped_column(String(191), nullable=False)
+    telephone: Mapped[str | None] = mapped_column(String(191), nullable=True)
     genre: Mapped[str] = mapped_column(String(191), nullable=False)
     nin: Mapped[str | None] = mapped_column(String(191), nullable=True)
     adresse: Mapped[str] = mapped_column(String(191), nullable=False)

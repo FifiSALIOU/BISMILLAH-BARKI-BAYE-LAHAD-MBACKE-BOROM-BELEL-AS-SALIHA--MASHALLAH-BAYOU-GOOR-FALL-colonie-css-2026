@@ -320,6 +320,7 @@ def create_inscription_for_parent_user(
     db.flush()
 
     rang = _next_rang_for_liste(db, target_liste.id)
+    now_utc = datetime.now(timezone.utc)
     demande = DemandeInscription(
         enfant_id=enfant.id,
         liste_id=target_liste.id,
@@ -328,6 +329,8 @@ def create_inscription_for_parent_user(
         statut=DemandeStatut.SOUMISE,
         non_validation_reason="",
         user_id=user.id,
+        created_at=now_utc,
+        updated_at=now_utc,
     )
     db.add(demande)
     db.flush()
@@ -371,6 +374,7 @@ def auto_sync_enfants_eligibles_du_parent(*, db: Session, user: User) -> None:
 
         # Aucun rang/liste en base tant que le parent n'a pas fait ses choix.
         enfant.is_titulaire = False
+        now_utc = datetime.now(timezone.utc)
         demande = DemandeInscription(
             enfant_id=enfant.id,
             liste_id=None,
@@ -379,6 +383,8 @@ def auto_sync_enfants_eligibles_du_parent(*, db: Session, user: User) -> None:
             statut=DemandeStatut.SOUMISE,
             non_validation_reason="",
             user_id=user.id,
+            created_at=now_utc,
+            updated_at=now_utc,
         )
         db.add(demande)
         db.flush()

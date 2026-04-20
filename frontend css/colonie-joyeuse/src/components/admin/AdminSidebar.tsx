@@ -164,7 +164,7 @@ export function AdminSidebar({ currentPage, onNavigate, isSuperAdmin }: Props) {
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton onClick={() => onNavigate('liste_rejetees')} isActive={currentPage === 'liste_rejetees'}>
                             <span className="w-2 h-2 shrink-0 rounded-full bg-amber-600/80" />
-                            <span>Demandes rejetées</span>
+                            <span>Demandes refusées</span>
                           </SidebarMenuSubButton>
                         </SidebarMenuSubItem>
                         <SidebarMenuSubItem>
@@ -182,7 +182,7 @@ export function AdminSidebar({ currentPage, onNavigate, isSuperAdmin }: Props) {
                   <SidebarMenuButton
                     onClick={() => onNavigate('historique')}
                     isActive={isHistoriqueSectionActive}
-                    tooltip="Historique — Demandes désistées / rejetées / Journal des actions"
+                    tooltip="Historique — Demandes désistées / refusées / Journal des actions"
                   >
                     <History className="w-4 h-4" />
                   </SidebarMenuButton>

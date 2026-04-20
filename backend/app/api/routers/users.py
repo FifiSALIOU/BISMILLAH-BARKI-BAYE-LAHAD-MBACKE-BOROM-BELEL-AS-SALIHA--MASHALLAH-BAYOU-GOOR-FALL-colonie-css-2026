@@ -119,16 +119,18 @@ def build_user_out(u: User) -> UserOut:
             matricule_out = m
         parent_prenom = pp.prenom
         parent_nom = pp.nom
-        if pp.service_obj is not None and (pp.service_obj.nom or "").strip():
+        # Affichage : `parents.service` d’abord, puis `services.nom` si texte vide (sans modifier l’enregistrement crayon).
+        st = (pp.service_text or "").strip()
+        if st and len(st) >= 2 and len(st) % 2 == 0:
+            half = st[: len(st) // 2]
+            if half == st[len(st) // 2 :]:
+                st = half
+        if st:
+            parent_service = st
+        elif pp.service_obj is not None and (pp.service_obj.nom or "").strip():
             parent_service = (pp.service_obj.nom or "").strip()
         else:
-            st = (pp.service_text or "").strip()
-            # Données parfois incohérentes : même acronyme enregistré deux fois d’affilée (ex. D.E.S.I.FD.E.S.I.F).
-            if st and len(st) >= 2 and len(st) % 2 == 0:
-                half = st[: len(st) // 2]
-                if half == st[len(st) // 2 :]:
-                    st = half
-            parent_service = st if st else None
+            parent_service = None
         parent_telephone = _public_parent_telephone(pp.telephone)
         parent_site_code = str(pp.site_obj.code) if pp.site_obj else (pp.site_text or None)
         email = pp.email or email

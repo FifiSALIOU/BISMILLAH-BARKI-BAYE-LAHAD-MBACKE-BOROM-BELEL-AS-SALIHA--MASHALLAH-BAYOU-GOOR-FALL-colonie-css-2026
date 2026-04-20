@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Pencil, Trash2, Briefcase } from 'lucide-react';
+import { Plus, Pencil, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/lib/api';
@@ -101,9 +101,12 @@ export default function GestionServices() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Services</h1>
-          <p className="text-muted-foreground">
-            Référentiel des services (ex. D.E.S.I.F.) utilisés lors de la création des comptes parents.
+          <p className="text-muted-foreground text-sm">
+            {rows.length === 1 ? '1 service' : `${rows.length} services`}
           </p>
+          {/* <p className="text-muted-foreground">
+            Référentiel des services (ex. D.E.S.I.F.) utilisés lors de la création des comptes parents.
+          </p> */}
         </div>
         <Button onClick={openAdd}>
           <Plus className="w-4 h-4 mr-2" />
@@ -113,10 +116,10 @@ export default function GestionServices() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          {/* <CardTitle className="flex items-center gap-2">
             <Briefcase className="w-5 h-5" />
             Services configurés
-          </CardTitle>
+          </CardTitle> */}
         </CardHeader>
         <CardContent>
           <Table>

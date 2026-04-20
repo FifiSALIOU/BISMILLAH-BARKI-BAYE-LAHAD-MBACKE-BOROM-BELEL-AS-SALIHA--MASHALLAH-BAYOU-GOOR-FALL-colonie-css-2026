@@ -163,43 +163,61 @@ export default function ListeDemandesDesistees() {
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
-                <TableHead className="font-semibold">Liste d&apos;origine</TableHead>
-                <TableHead className="font-semibold">Rang</TableHead>
                 <TableHead className="font-semibold">Matricule</TableHead>
-                <TableHead className="font-semibold">Parent</TableHead>
-                <TableHead className="font-semibold">Enfant</TableHead>
+                <TableHead className="font-semibold">Nom Parent</TableHead>
+                <TableHead className="font-semibold">Prénom Parent</TableHead>
+                <TableHead className="font-semibold">Nom Enfant</TableHead>
+                <TableHead className="font-semibold">Prénom Enfant</TableHead>
                 <TableHead className="font-semibold">Âge</TableHead>
-                <TableHead className="font-semibold">Statut liste</TableHead>
+                <TableHead className="font-semibold">Liste d&apos;origine</TableHead>
+                <TableHead className="font-semibold">Statut</TableHead>
+                <TableHead className="font-semibold">Date désistement</TableHead>
+                <TableHead className="font-semibold">Heure du désistement</TableHead>
                 <TableHead className="font-semibold">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center py-12 text-muted-foreground">
+                  <TableCell colSpan={11} className="text-center py-12 text-muted-foreground">
                     Aucune demande désistée
                   </TableCell>
                 </TableRow>
               ) : (
                 filtered.map((e) => (
                   <TableRow key={e.demandeId}>
-                    <TableCell className="text-sm">{getListeLabel(e.liste)}</TableCell>
-                    <TableCell className="text-center font-medium">{e.rang}</TableCell>
                     <TableCell className="font-mono text-sm">{e.parentMatricule}</TableCell>
-                    <TableCell className="text-sm">
-                      {(e.parentPrenom || '') + ' ' + (e.parentNom || '')}
-                    </TableCell>
-                    <TableCell className="text-sm font-medium">
-                      {e.prenom} {e.nom}
-                    </TableCell>
+                    <TableCell className="text-sm">{e.parentNom || '—'}</TableCell>
+                    <TableCell className="text-sm">{e.parentPrenom || '—'}</TableCell>
+                    <TableCell className="text-sm font-medium">{e.nom}</TableCell>
+                    <TableCell className="text-sm font-medium">{e.prenom}</TableCell>
                     <TableCell>{calculateAge(e.dateNaissance)} ans</TableCell>
+                    <TableCell className="text-sm">{getListeLabel(e.liste)}</TableCell>
                     <TableCell>
-                      <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground">{e.statut}</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${e.statut === 'Suppléant N1' ? 'bg-accent/10 text-accent border border-accent/20' : 'bg-muted text-muted-foreground'}`}>{e.statut}</span>
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {e.updatedAt
+                        ? new Date(e.updatedAt).toLocaleDateString('fr-FR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                          })
+                        : '—'}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {e.updatedAt
+                        ? new Date(e.updatedAt).toLocaleTimeString('fr-FR', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })
+                        : '—'}
                     </TableCell>
                     <TableCell>
                       <Button size="sm" variant="ghost" onClick={() => setDetail(e)} className="gap-1 text-xs rounded-lg h-7 px-2">
                         <Eye className="w-3 h-3" />
-                        Détails
+                        Voir détails
                       </Button>
                     </TableCell>
                   </TableRow>

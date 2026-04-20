@@ -361,8 +361,8 @@ def update_user(
         if parent_telephone is not None:
             tel = normalize_parent_telephone_for_storage(parent_telephone, matricule=parent.matricule)
             raise_if_parent_telephone_conflict(db, tel_stash=tel, parent=parent)
-            # Colonne non nullable : chaîne vide si l’admin efface le numéro (normalize → None).
-            parent.telephone = tel if tel is not None else ""
+            # NULL en base si numéro absent (normalize → None) : évite la contrainte unique sur plusieurs ''.
+            parent.telephone = tel
         if parent_service is not None:
             service = _get_or_create_service(db, parent_service)
             parent.service_id = service.id

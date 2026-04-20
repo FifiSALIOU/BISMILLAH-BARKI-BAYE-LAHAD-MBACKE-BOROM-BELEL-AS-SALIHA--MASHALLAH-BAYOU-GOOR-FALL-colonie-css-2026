@@ -78,6 +78,8 @@ export default function GestionListe({ type }: Props) {
   const [refusOpen, setRefusOpen] = useState(false);
   const [refusTarget, setRefusTarget] = useState<Enfant | null>(null);
   const [motifRefus, setMotifRefus] = useState('');
+  /** Liste N°2 — bouton « Refus définitif » : après le refus type « Refuser », enchaîner `refus-definitif` (`rejet_definitif = true`). */
+  const [refusEnsuiteDefinitifN2, setRefusEnsuiteDefinitifN2] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewMime, setPreviewMime] = useState('');
@@ -247,16 +249,48 @@ export default function GestionListe({ type }: Props) {
    */
 
   const handleRefuser = async () => {
-    if (!refusTarget || !motifRefus.trim()) return;
-    await apiRequest(`/admin/demandes/${refusTarget.demandeId}/selection-finale`, {
-      method: 'POST',
-      token,
-      body: JSON.stringify({ is_selection_finale: false, non_validation_reason: motifRefus.trim() }),
-    });
-    addHistorique({ utilisateur: 'Gestionnaire', role: 'Admin', action: 'Refus', details: `A refusé la demande de ${refusTarget.prenom} ${refusTarget.nom}. Motif : ${motifRefus.trim()}`, cible: `${refusTarget.prenom} ${refusTarget.nom}` });
-    toast({ title: '❌ Demande refusée', description: `${refusTarget.prenom} ${refusTarget.nom} — Motif : ${motifRefus}` });
-    setRefusOpen(false); setRefusTarget(null); setMotifRefus('');
-    setRefreshTick((t) => t + 1);
+    if (!token || !refusTarget || !motifRefus.trim()) return;
+    const chainDefinitif = refusEnsuiteDefinitifN2;
+    const id = refusTarget.demandeId;
+    const motif = motifRefus.trim();
+    const prenom = refusTarget.prenom;
+    const nom = refusTarget.nom;
+    try {
+      await apiRequest(`/admin/demandes/${id}/selection-finale`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ is_selection_finale: false, non_validation_reason: motif }),
+      });
+      if (chainDefinitif) {
+        await apiRequest(`/admin/demandes/${id}/refus-definitif`, { method: 'POST', token });
+      }
+      addHistorique({
+        utilisateur: 'Gestionnaire',
+        role: 'Admin',
+        action: chainDefinitif ? 'Refus définitif' : 'Refus',
+        details: chainDefinitif
+          ? `A refusé définitivement la demande de ${prenom} ${nom}. Motif : ${motif}`
+          : `A refusé la demande de ${prenom} ${nom}. Motif : ${motif}`,
+        cible: `${prenom} ${nom}`,
+      });
+      toast({
+        title: chainDefinitif ? '❌ Refus définitif enregistré' : '❌ Demande refusée',
+        description: `${prenom} ${nom} — Motif : ${motif}`,
+      });
+      setRefusOpen(false);
+      setRefusTarget(null);
+      setMotifRefus('');
+      setRefusEnsuiteDefinitifN2(false);
+      setRefreshTick((t) => t + 1);
+    } catch {
+      toast({
+        title: 'Erreur',
+        description: chainDefinitif
+          ? 'Le refus ou le passage en refus définitif a échoué. Vérifiez l’état de la demande.'
+          : 'Le refus n’a pas pu être enregistré.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleVoirJustificatif = (enfant: Enfant) => {
@@ -299,20 +333,10 @@ export default function GestionListe({ type }: Props) {
     setRefreshTick((t) => t + 1);
   };
 
-  const handleRefuserJustificatif = async (enfant: Enfant) => {
-    if (!token) return;
-    await apiRequest(`/admin/demandes/${enfant.demandeId}/refuser-justificatif`, {
-      method: 'POST',
-      token,
-    });
-    toast({ title: '❌ Justificatif refusé (définitif)' });
-    setRefreshTick((t) => t + 1);
-  };
-
   const generateCSV = () => {
     const headers = ['Rang', 'Matricule', 'Nom Parent', 'Prénom Parent', 'Service', 'Agence', 'Nom Enfant', 'Prénom Enfant', 'Âge', 'Sexe', 'Statut', 'Informations', 'Désistement'];
     const rows = enfantsOrdreArrivee.map((e) => {
-      return [e.rang, e.parentMatricule, e.parentNom || '', e.parentPrenom || '', e.parentService || '', e.parentAgence || '', e.nom, e.prenom, calculateAge(e.dateNaissance), e.sexe === 'M' ? 'Masculin' : 'Féminin', e.statut, e.validation || 'en_attente', e.desistement || 'Aucun'];
+      return [e.rang, e.parentMatricule, e.parentNom || '', e.parentPrenom || '', e.parentService || '', e.parentAgence || '', e.nom, e.prenom, `${calculateAge(e.dateNaissance)} ans`, e.sexe === 'M' ? 'Masculin' : 'Féminin', e.statut, e.validation || 'en_attente', e.desistement || 'Aucun'];
     });
     return { headers, rows };
   };
@@ -483,7 +507,7 @@ export default function GestionListe({ type }: Props) {
                           */}
                           {/* Action "Refuser" masquée à la demande.
                           {validation === 'en_attente' && !e.desistement && (
-                            <Button size="sm" onClick={() => { setRefusTarget(e); setRefusOpen(true); }} className="gap-1 text-xs rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground h-7 px-2">
+                            <Button size="sm" onClick={() => { setRefusEnsuiteDefinitifN2(false); setRefusTarget(e); setRefusOpen(true); }} className="gap-1 text-xs rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground h-7 px-2">
                               <ThumbsDown className="w-3 h-3" />Refuser
                             </Button>
                           )}
@@ -510,7 +534,15 @@ export default function GestionListe({ type }: Props) {
                               <Button size="sm" onClick={() => handleValiderJustificatif(e)} className="gap-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3">
                                 <CheckCircle2 className="w-3 h-3" />Valider
                               </Button>
-                              <Button size="sm" onClick={() => handleRefuserJustificatif(e)} className="gap-1 text-xs rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground h-8 px-3">
+                              <Button
+                                size="sm"
+                                onClick={() => {
+                                  setRefusEnsuiteDefinitifN2(true);
+                                  setRefusTarget(e);
+                                  setRefusOpen(true);
+                                }}
+                                className="gap-1 text-xs rounded-lg bg-destructive hover:bg-destructive/90 text-destructive-foreground h-8 px-3"
+                              >
                                 <ThumbsDown className="w-3 h-3" />Refus définitif
                               </Button>
                             </>
@@ -685,21 +717,40 @@ export default function GestionListe({ type }: Props) {
       </Dialog>
 
       {/* Refus Dialog */}
-      <Dialog open={refusOpen} onOpenChange={setRefusOpen}>
+      <Dialog
+        open={refusOpen}
+        onOpenChange={(o) => {
+          setRefusOpen(o);
+          if (!o) {
+            setMotifRefus('');
+            setRefusEnsuiteDefinitifN2(false);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md rounded-xl">
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center"><ThumbsDown className="w-5 h-5 text-destructive" /></div>
               <DialogTitle className="text-foreground">Refuser la demande</DialogTitle>
             </div>
-            <DialogDescription className="pt-2">Vous êtes sur le point de refuser la demande de <strong>{refusTarget?.prenom} {refusTarget?.nom}</strong>. Veuillez indiquer le motif du refus.</DialogDescription>
+            <DialogDescription className="pt-2">Vous êtes sur le point de refuser définitivement la demande de <strong>{refusTarget?.prenom} {refusTarget?.nom}</strong>. Veuillez indiquer le motif du refus.</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
             <Label>Motif du refus *</Label>
             <Textarea value={motifRefus} onChange={e => setMotifRefus(e.target.value)} placeholder="Indiquez le motif du refus..." className="rounded-lg min-h-[80px]" />
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setRefusOpen(false); setMotifRefus(''); }} className="rounded-lg">Annuler</Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setRefusOpen(false);
+                setMotifRefus('');
+                setRefusEnsuiteDefinitifN2(false);
+              }}
+              className="rounded-lg"
+            >
+              Annuler
+            </Button>
             <Button onClick={handleRefuser} disabled={!motifRefus.trim()} className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90">Refuser</Button>
           </DialogFooter>
         </DialogContent>
