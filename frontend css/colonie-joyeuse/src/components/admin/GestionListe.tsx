@@ -621,7 +621,9 @@ export default function GestionListe({ type }: Props) {
                     <p className="text-sm text-muted-foreground">Aucune pièce justificative jointe.</p>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground pt-2 border-t border-border">Inscrit le {new Date(detailEnfant.dateInscription).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                <div className="text-xs text-muted-foreground pt-2 border-t border-border">
+                  Inscrit le {new Date(detailEnfant.dateInscription).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} à {new Date(detailEnfant.dateInscription).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </div>
               </div>
             );
           })()}
@@ -678,7 +680,9 @@ export default function GestionListe({ type }: Props) {
                     <p className="text-sm text-muted-foreground">Aucune pièce justificative jointe.</p>
                   )}
                 </div>
-                <div className="text-xs text-muted-foreground pt-2 border-t border-border">Inscrit le {new Date(detailEnfant.dateInscription).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
+                <div className="text-xs text-muted-foreground pt-2 border-t border-border">
+                  Inscrit le {new Date(detailEnfant.dateInscription).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} à {new Date(detailEnfant.dateInscription).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </div>
               </div>
             );
           })()}

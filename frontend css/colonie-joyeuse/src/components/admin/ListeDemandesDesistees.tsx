@@ -271,7 +271,7 @@ export default function ListeDemandesDesistees() {
                     <span className="text-muted-foreground">Âge :</span> {calculateAge(detail.dateNaissance)} ans
                   </div>
                   <div>
-                    <span className="text-muted-foreground">Liste d&apos;origine :</span> {getListeLabel(detail.liste)} (rang {detail.rang})
+                    <span className="text-muted-foreground">Liste d&apos;origine :</span> {getListeLabel(detail.liste)}
                   </div>
                 </div>
               </div>

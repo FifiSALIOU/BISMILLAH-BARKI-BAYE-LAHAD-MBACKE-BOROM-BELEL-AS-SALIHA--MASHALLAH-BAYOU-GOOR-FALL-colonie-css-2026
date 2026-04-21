@@ -677,6 +677,7 @@ export default function GestionUtilisateurs() {
                   <TableHead className="font-semibold">Matricule</TableHead>
                   <TableHead className="font-semibold">Nom</TableHead>
                   <TableHead className="font-semibold">Prénom</TableHead>
+                  <TableHead className="font-semibold">Agence</TableHead>
                   <TableHead className="font-semibold">Service</TableHead>
                   <TableHead className="font-semibold tabular-nums">Enfants</TableHead>
                   <TableHead className="font-semibold">Statut</TableHead>
@@ -686,7 +687,7 @@ export default function GestionUtilisateurs() {
               <TableBody>
                 {filteredParents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                       {parents.length === 0
                         ? 'Aucun parent enregistré.'
                         : 'Aucun parent ne correspond au filtre.'}
@@ -698,6 +699,9 @@ export default function GestionUtilisateurs() {
                     <TableCell className="font-mono tabular-nums text-sm">{p.matricule}</TableCell>
                     <TableCell className="font-medium">{p.nom}</TableCell>
                     <TableCell>{p.prenom}</TableCell>
+                    <TableCell className="text-sm">
+                      {sites.find((s) => String(s.code) === String(p.site || p.site_code || ''))?.nom || (p.site || p.site_code || '-')}
+                    </TableCell>
                     <TableCell className="text-sm">{p.service}</TableCell>
                     <TableCell className="tabular-nums text-sm text-center">{p.nbEnfants}</TableCell>
                     <TableCell>

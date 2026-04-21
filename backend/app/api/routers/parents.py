@@ -46,6 +46,7 @@ from app.services.email import send_email, uniq_emails
 from app.services.notify_helpers import collect_admin_emails
 from app.services.liste_finale_compute import demandes_liste_finale_retenus_si_cloturees
 from app.services.liste_finale_lock import liste_finale_definitive_validee
+from app.services.runtime_settings_store import get_max_enfants_par_parent
 from app.services.email_templates import (
     body_desistement_validated_admin,
     body_inscription_admin_notify,
@@ -200,22 +201,57 @@ def creer_inscription_non_biologique_n2(
     if parent is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent introuvable.")
 
-    # Réservé au cas N2 « non biologique » : pas d’enfant biologique / codifié (lien ≠ Autre).
-    # Les enfants déjà créés par cette même voie (lien Autre) ne bloquent pas une nouvelle demande.
-    a_un_enfant_biologique_ou_codifie = (
-        db.query(Enfant)
-        .filter(Enfant.parent_id == parent.id, Enfant.lien_parente != LienParente.AUTRE)
+    ensure_listes_exist(db)
+    liste_p = db.query(Liste).filter(Liste.code == ListeCode.PRINCIPALE).first()
+    liste_n1 = db.query(Liste).filter(Liste.code == ListeCode.ATTENTE_N1).first()
+    liste_n2 = db.query(Liste).filter(Liste.code == ListeCode.ATTENTE_N2).first()
+    if liste_p is None or liste_n1 is None or liste_n2 is None:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste introuvable.")
+
+    max_ep = get_max_enfants_par_parent(default=2)
+    occupe_titulaire = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(
+            Enfant.parent_id == parent.id,
+            DemandeInscription.liste_id == liste_p.id,
+            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE)),
+        )
         .first()
         is not None
     )
-    if a_un_enfant_biologique_ou_codifie:
+    occupe_n1 = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(
+            Enfant.parent_id == parent.id,
+            DemandeInscription.liste_id == liste_n1.id,
+            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE)),
+        )
+        .first()
+        is not None
+    )
+    occupe_n2_bio = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(
+            Enfant.parent_id == parent.id,
+            DemandeInscription.liste_id == liste_n2.id,
+            Enfant.lien_parente != LienParente.AUTRE,
+            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE)),
+        )
+        .first()
+        is not None
+    )
+    places_listes_parent_saison = (1 if occupe_titulaire else 0) + (1 if occupe_n1 else 0) + (1 if occupe_n2_bio else 0)
+    if places_listes_parent_saison >= max_ep:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cette action est réservée aux parents sans enfant préchargé (biologique).",
+            detail="Limite maximale atteinte pour cette saison. Impossible d'inscrire un enfant non biologique.",
         )
 
-    # Règle métier spécifique N2 non biologique :
-    # un parent sans enfant codifié ne peut faire qu'une seule inscription non biologique.
+    # Règle métier N2 non biologique :
+    # une seule inscription non biologique est autorisée par parent.
     nb_non_bio_deja_inscrits = (
         db.query(func.count(func.distinct(Enfant.id)))
         .select_from(Enfant)
@@ -238,10 +274,7 @@ def creer_inscription_non_biologique_n2(
             detail="Date de naissance invalide : elle doit être comprise entre 2012 et 2019.",
         )
 
-    ensure_listes_exist(db)
-    target_liste = db.query(Liste).filter(Liste.code == ListeCode.ATTENTE_N2).first()
-    if target_liste is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste N2 introuvable.")
+    target_liste = liste_n2
 
     path, nom_fichier, mime, taille = _save_justificatifs_files(justificatif)
     enfant = Enfant(

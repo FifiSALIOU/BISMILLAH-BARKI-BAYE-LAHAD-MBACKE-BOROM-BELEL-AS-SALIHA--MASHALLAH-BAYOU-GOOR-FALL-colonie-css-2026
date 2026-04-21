@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Search, RotateCcw, Ban, AlertTriangle, Eye, ChevronDown } from 'lucide-react';
+import { Search, RotateCcw, Ban, AlertTriangle, Eye, ChevronDown, FileText, X } from 'lucide-react';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { apiRequest } from '@/lib/api';
+import { API_BASE_URL, apiRequest } from '@/lib/api';
 import { listeApiToUi } from '@/lib/listeCodes';
 import { toast } from '@/hooks/use-toast';
 import type { Enfant } from '@/data/mockData';
@@ -47,6 +47,12 @@ export type RejetApiRow = {
   parent_telephone?: string;
   parent_site?: string | null;
   enfant: ApiEnfant;
+  justificatif_nom_fichier?: string | null;
+  justificatif_mime_type?: string | null;
+  justificatif_taille?: number | null;
+  justificatif_uploaded_at?: string | null;
+  justificatif_valide?: boolean | null;
+  justificatif_valide_at?: string | null;
 };
 
 type RejetsResponse = {
@@ -183,6 +189,11 @@ export default function ListeDemandesRejetees() {
   const [refusDefRow, setRefusDefRow] = useState<RejetApiRow | null>(null);
   const [detailRefusRow, setDetailRefusRow] = useState<RejetApiRow | null>(null);
   const [saving, setSaving] = useState(false);
+  const [justifPreviewOpen, setJustifPreviewOpen] = useState(false);
+  const [justifPreviewUrl, setJustifPreviewUrl] = useState<string | null>(null);
+  const [justifPreviewMime, setJustifPreviewMime] = useState('');
+  const [justifPreviewName, setJustifPreviewName] = useState('');
+  const [justifPreviewLoading, setJustifPreviewLoading] = useState(false);
 
   const [formPrenom, setFormPrenom] = useState('');
   const [formNom, setFormNom] = useState('');
@@ -252,6 +263,43 @@ export default function ListeDemandesRejetees() {
       setSaving(false);
     }
   };
+
+  const handleVoirJustificatif = (demandeId: number, fileName: string | null | undefined) => {
+    if (!token) return;
+    setJustifPreviewLoading(true);
+    fetch(`${API_BASE_URL}/admin/demandes/${demandeId}/justificatif`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        if (!res.ok) throw new Error('Impossible de télécharger le justificatif.');
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        setJustifPreviewUrl((prev) => {
+          if (prev) URL.revokeObjectURL(prev);
+          return url;
+        });
+        setJustifPreviewMime(blob.type || '');
+        setJustifPreviewName((fileName || '').trim() || 'justificatif');
+        setJustifPreviewOpen(true);
+      })
+      .catch((err) => {
+        toast({
+          title: 'Erreur',
+          description: err instanceof Error ? err.message : 'Erreur justificatif',
+          variant: 'destructive',
+        });
+      })
+      .finally(() => setJustifPreviewLoading(false));
+  };
+
+  useEffect(() => {
+    if (!justifPreviewOpen && justifPreviewUrl) {
+      URL.revokeObjectURL(justifPreviewUrl);
+      setJustifPreviewUrl(null);
+      setJustifPreviewMime('');
+      setJustifPreviewName('');
+    }
+  }, [justifPreviewOpen, justifPreviewUrl]);
 
   const renderTableAttenteCorrection = (rows: RejetApiRow[]) => (
     <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-card">
@@ -631,7 +679,7 @@ export default function ListeDemandesRejetees() {
           </DialogHeader>
           {detailRefusRow && (
             <div className="space-y-4 text-sm">
-              <p className="text-xs text-muted-foreground">Demande n° {detailRefusRow.demande_id}</p>
+              {/* <p className="text-xs text-muted-foreground">Demande n° {detailRefusRow.demande_id}</p> */}
               <div className="grid gap-3 sm:grid-cols-2">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">Matricule</p>
@@ -689,6 +737,27 @@ export default function ListeDemandesRejetees() {
                   <p className="text-xs font-medium text-muted-foreground">Heure du refus</p>
                   <p className="mt-0.5 tabular-nums">{formatHeureRefusHhMm(detailRefusRow.updated_at)}</p>
                 </div>
+                <div className="sm:col-span-2 border-t border-border pt-3 mt-1">
+                  <p className="text-xs font-medium text-muted-foreground">Pièce justificative</p>
+                  {detailRefusRow.justificatif_nom_fichier?.trim() ? (
+                    <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                      <span className="text-sm text-foreground break-all">{detailRefusRow.justificatif_nom_fichier}</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="w-fit gap-2 rounded-lg"
+                        disabled={justifPreviewLoading}
+                        onClick={() => handleVoirJustificatif(detailRefusRow.demande_id, detailRefusRow.justificatif_nom_fichier)}
+                      >
+                        <FileText className="w-4 h-4 shrink-0" aria-hidden />
+                        Voir le document
+                      </Button>
+                    </div>
+                  ) : (
+                    <p className="mt-1 text-sm text-muted-foreground">Aucun document joint</p>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -697,6 +766,32 @@ export default function ListeDemandesRejetees() {
               Fermer
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={justifPreviewOpen} onOpenChange={setJustifPreviewOpen}>
+        <DialogContent className="sm:max-w-4xl rounded-xl p-0 overflow-hidden">
+          <div className="relative bg-card">
+            <button
+              type="button"
+              onClick={() => setJustifPreviewOpen(false)}
+              className="absolute right-3 top-3 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-background hover:bg-muted z-10"
+              aria-label="Fermer l'aperçu"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <div className="px-5 py-4 border-b border-border">
+              <DialogTitle className="text-base text-foreground">Pièce justificative</DialogTitle>
+              <DialogDescription className="pt-1">{justifPreviewName}</DialogDescription>
+            </div>
+            <div className="p-4 bg-muted/20">
+              {justifPreviewUrl && justifPreviewMime.startsWith('image/') ? (
+                <img src={justifPreviewUrl} alt={justifPreviewName} className="max-h-[70vh] w-full object-contain rounded-md bg-background" />
+              ) : justifPreviewUrl ? (
+                <iframe src={justifPreviewUrl} title={justifPreviewName} className="w-full h-[70vh] rounded-md bg-background" />
+              ) : null}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

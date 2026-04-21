@@ -129,6 +129,7 @@ export default function ParentDashboard() {
 
   // Inscription dialog
   const [inscrireOpen, setInscrireOpen] = useState(false);
+  const [inscrireNonBioMode, setInscrireNonBioMode] = useState(false);
 
   // Action states (from MesEnfants)
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -188,7 +189,7 @@ export default function ParentDashboard() {
     });
   }, [mesEnfants, settings.ageMin, settings.ageMax]);
 
-  /** Places « P + N1 + N2 biologique » occupées : aligné sur le plafond MAX (2 ou 3) sans autre changement métier. */
+  /** Places « P + N1 + N2 » occupées (biologique ou non) : aligné sur le plafond MAX (2 ou 3) sans autre changement métier. */
   const placesListesParentSaison = useMemo(() => {
     const occupeTitulaire = enfantsMesEligibles.some((e) => e.statut === 'Titulaire' && !e.desistement);
     const occupeN1 = enfantsMesEligibles.some((e) => e.liste === 'attente_n1' && !e.desistement);
@@ -198,13 +199,17 @@ export default function ParentDashboard() {
         e.liste === 'attente_n2' &&
         e.lienParente !== 'Autre' &&
         e.statut !== 'Titulaire');
-    const bioN2Inscrit = (e: Enfant) =>
-      e.lienParente !== 'Autre' && e.liste === 'attente_n2' && !nonInscritPourCompte(e);
-    const occupeN2Bio = enfantsMesEligibles.some((e) => bioN2Inscrit(e) && !e.desistement);
-    return (occupeTitulaire ? 1 : 0) + (occupeN1 ? 1 : 0) + (occupeN2Bio ? 1 : 0);
+    const n2Inscrit = (e: Enfant) =>
+      e.liste === 'attente_n2' &&
+      (
+        e.lienParente === 'Autre' ||
+        !nonInscritPourCompte(e)
+      );
+    const occupeN2 = enfantsMesEligibles.some((e) => n2Inscrit(e) && !e.desistement);
+    return (occupeTitulaire ? 1 : 0) + (occupeN1 ? 1 : 0) + (occupeN2 ? 1 : 0);
   }, [enfantsMesEligibles]);
 
-  /** Ordre des cartes « Mes enfants » uniquement : Titulaire → N1 → N2 biologique inscrit → le reste (affichage seul). */
+  /** Ordre des cartes « Mes enfants » uniquement : Titulaire → N1 → N2 inscrit (bio ou non bio) → le reste (affichage seul). */
   const enfantsMesEligiblesOrdreAffichage = useMemo(() => {
     const nonInscritPourTri = (e: Enfant) =>
       (e.sansAttributionListe === true && e.lienParente !== 'Autre' && e.statut !== 'Titulaire') ||
@@ -212,12 +217,16 @@ export default function ParentDashboard() {
         e.liste === 'attente_n2' &&
         e.lienParente !== 'Autre' &&
         e.statut !== 'Titulaire');
-    const bioN2Inscrit = (e: Enfant) =>
-      e.lienParente !== 'Autre' && e.liste === 'attente_n2' && !nonInscritPourTri(e);
+    const n2Inscrit = (e: Enfant) =>
+      e.liste === 'attente_n2' &&
+      (
+        e.lienParente === 'Autre' ||
+        !nonInscritPourTri(e)
+      );
     const rank = (e: Enfant): number => {
       if (e.statut === 'Titulaire') return 0;
       if (e.statut === 'Suppléant N1') return 1;
-      if (bioN2Inscrit(e)) return 2;
+      if (n2Inscrit(e)) return 2;
       return 3;
     };
     return [...enfantsMesEligibles]
@@ -309,6 +318,7 @@ export default function ParentDashboard() {
   const enfantN1 = enfantsMesEligibles.find((e) => e.liste === 'attente_n1' && !e.desistement);
   const hasTitulaire = enfantsMesEligibles.some((e) => e.statut === 'Titulaire');
   const hasSuppleantN1 = enfantsMesEligibles.some((e) => e.liste === 'attente_n1' && !e.desistement);
+  const hasAnySuppleantN1 = enfantsMesEligibles.some((e) => e.liste === 'attente_n1');
   const isNonInscrit = (e: Enfant) =>
     (e.sansAttributionListe === true && e.lienParente !== 'Autre' && e.statut !== 'Titulaire') ||
     (e.rangListe == null &&
@@ -317,6 +327,8 @@ export default function ParentDashboard() {
       e.statut !== 'Titulaire');
 
   const capListesTitulaireN1Atteint = MAX != null && (placesListesParentSaison >= MAX || limiteMaxDejaAtteinte);
+  const parentAvecEnfantCodifie = enfantsMesEligibles.some((e) => e.lienParente !== 'Autre');
+  const desactiverInscriptionNonBio = parentAvecEnfantCodifie && capListesTitulaireN1Atteint;
   const actionsTitulaireN1BloqueesPourCarte = (e: Enfant) =>
     capListesTitulaireN1Atteint && isNonInscrit(e) && e.lienParente !== 'Autre';
   /** Biologique déjà affecté à la liste N°2 (vraie inscription N2) : masquer Titulaire / N1 / N2, garder désistement. Ne concerne pas « Autre » ni « non inscrit ». */
@@ -496,7 +508,8 @@ export default function ParentDashboard() {
     }
   };
 
-  const afficherBoutonSuppleantN1PourCarte = (e: Enfant) => e.statut !== 'Suppléant N1';
+  const afficherBoutonSuppleantN1PourCarte = (e: Enfant) =>
+    e.statut !== 'Suppléant N1' && !hasAnySuppleantN1;
 
   const handleEditDemande = (enfant: Enfant) => {
     const lienApi = LIEN_PARENTE_FR_TO_API[enfant.lienParente] || 'AUTRE';
@@ -721,8 +734,13 @@ export default function ParentDashboard() {
   /** Parent sans enfant codifié côté RH : liste vide ou uniquement des inscriptions « Autre » (non biologique). */
   const parentQueDesNonBio = enfants.every((e) => e.lienParente === 'Autre');
   const nonBioInscriptionsCount = enfants.filter((e) => e.lienParente === 'Autre').length;
-  const nonBioUniqueLimitReached = parentQueDesNonBio && nonBioInscriptionsCount >= 1;
-  const afficherInscriptionNonBio = !inscriptionsCloturees && parentQueDesNonBio && !nonBioUniqueLimitReached;
+  const nonBioUniqueLimitReached = nonBioInscriptionsCount >= 1;
+  const afficherInscriptionNonBio =
+    !inscriptionsCloturees &&
+    (
+      !nonBioUniqueLimitReached ||
+      (parentAvecEnfantCodifie && capListesTitulaireN1Atteint)
+    );
 
   useEffect(() => {
     if (!demandesParentChargees || MAX == null) return;
@@ -880,9 +898,14 @@ export default function ParentDashboard() {
               </div>
             </div>
             {afficherInscriptionNonBio && (
-              <Button onClick={() => setInscrireOpen(true)} variant="outline" className="rounded-lg h-10 px-4 gap-2 text-sm">
+              <Button
+                onClick={() => { setInscrireNonBioMode(true); setInscrireOpen(true); }}
+                disabled={desactiverInscriptionNonBio}
+                variant="outline"
+                className="rounded-lg h-10 px-4 gap-2 text-sm"
+              >
                 <UserPlus className="w-4 h-4" />
-                Inscrire un enfant (non biologique)
+                Ajouter un enfant (lien "Autre")
               </Button>
             )}
           </div>
@@ -1072,9 +1095,14 @@ export default function ParentDashboard() {
         )}
         {afficherInscriptionNonBio && enfantsMesEligibles.length > 0 && (
           <div className="max-w-4xl">
-            <Button onClick={() => setInscrireOpen(true)} variant="outline" className="rounded-lg h-10 px-4 gap-2 text-sm">
+            <Button
+              onClick={() => { setInscrireNonBioMode(true); setInscrireOpen(true); }}
+              disabled={desactiverInscriptionNonBio}
+              variant="outline"
+              className="rounded-lg h-10 px-4 gap-2 text-sm"
+            >
               <UserPlus className="w-4 h-4" />
-              Inscrire un autre enfant (non biologique)
+              Ajouter un enfant (lien "Autre")
             </Button>
           </div>
         )}
@@ -1117,12 +1145,12 @@ export default function ParentDashboard() {
       )}
 
       {/* Inscription Dialog */}
-      <Dialog open={inscrireOpen} onOpenChange={setInscrireOpen}>
+      <Dialog open={inscrireOpen} onOpenChange={(open) => { setInscrireOpen(open); if (!open) setInscrireNonBioMode(false); }}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl">
           <InscrireEnfant
-            onClose={() => setInscrireOpen(false)}
+            onClose={() => { setInscrireOpen(false); setInscrireNonBioMode(false); }}
             nbEnfantsInscrits={enfants.length}
-            nonBiologiqueMode={parentQueDesNonBio}
+            nonBiologiqueMode={inscrireNonBioMode}
             onInscriptionSuccess={() => { void loadAll(); }}
           />
         </DialogContent>

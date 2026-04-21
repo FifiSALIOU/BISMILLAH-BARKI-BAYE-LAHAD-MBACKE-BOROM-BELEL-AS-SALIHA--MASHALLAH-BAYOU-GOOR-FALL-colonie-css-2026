@@ -10,6 +10,7 @@ export default function Statistiques() {
   const { enfants } = useInscription();
   const { token } = useAuth();
   const [statsApi, setStatsApi] = useState<any>(null);
+  const [demandesActivesRows, setDemandesActivesRows] = useState<any[]>([]);
   const [serviceStats, setServiceStats] = useState<Record<string, number>>({});
   const [garcons, setGarcons] = useState(0);
   const [filles, setFilles] = useState(0);
@@ -26,6 +27,7 @@ export default function Statistiques() {
       .then(([stats, principaleRows, n1Rows, n2Rows]) => {
         setStatsApi(stats);
         const all = [...principaleRows, ...n1Rows, ...n2Rows];
+        setDemandesActivesRows(all);
         const byService: Record<string, number> = {};
         all.forEach((r) => {
           const s = (r?.parent_service as string | undefined)?.trim() || 'Non défini';
@@ -58,20 +60,28 @@ export default function Statistiques() {
     const sbl = statsApi.selected_by_liste;
     return ibl?.attente_n2 ?? sbl?.ATTENTE_N2 ?? sbl?.attente_n2 ?? 0;
   }, [statsApi, enfants]);
-  const totalParents = statsApi?.total_parents ?? new Set(enfants.map(e => e.parentMatricule)).size;
-  const totalEnfants = statsApi?.total_enfants ?? enfants.length;
+  /** Même périmètre que les listes P / N1 / N2 : demandes SOUMISE ou RETENUE uniquement. */
+  const totalEnfantsActifs = demandesActivesRows.length;
+  const totalParentsActifs = useMemo(
+    () => new Set(demandesActivesRows.map((r) => (r?.parent_matricule as string | undefined)?.trim()).filter(Boolean)).size,
+    [demandesActivesRows],
+  );
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold text-foreground">Statistiques</h1>
         <p className="text-muted-foreground mt-1">Données analytiques de la Colonie de Vacances 2026</p>
+        <p className="text-sm text-muted-foreground mt-2 max-w-3xl">
+          Les indicateurs ci-dessous sont calculés sur les <strong className="text-foreground font-medium">inscriptions actives</strong>{' '}
+          (demandes soumises ou retenues) présentes sur les listes Principale, N°1 et N°2 — comme dans la gestion des listes.
+        </p>
       </motion.div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: 'Total enfants', value: totalEnfants, icon: Users, color: 'text-primary', bg: 'bg-primary/10' },
-          { label: 'Parents inscrits', value: totalParents, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Total enfants', value: totalEnfantsActifs, icon: Users, color: 'text-primary', bg: 'bg-primary/10' },
+          { label: 'Parents inscrits', value: totalParentsActifs, icon: UserCheck, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Garçons', value: garcons, icon: BarChart3, color: 'text-primary', bg: 'bg-primary/10' },
           { label: 'Filles', value: filles, icon: TrendingUp, color: 'text-accent', bg: 'bg-accent/10' },
         ].map((s, i) => (
@@ -97,19 +107,19 @@ export default function Statistiques() {
             <div>
               <div className="flex justify-between mb-1">
                 <span className="text-sm text-muted-foreground">Garçons</span>
-                <span className="text-sm font-medium text-foreground">{garcons} ({totalEnfants > 0 ? Math.round((garcons / totalEnfants) * 100) : 0}%)</span>
+                <span className="text-sm font-medium text-foreground">{garcons} ({totalEnfantsActifs > 0 ? Math.round((garcons / totalEnfantsActifs) * 100) : 0}%)</span>
               </div>
               <div className="h-3 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${totalEnfants > 0 ? (garcons / totalEnfants) * 100 : 0}%` }} />
+                <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${totalEnfantsActifs > 0 ? (garcons / totalEnfantsActifs) * 100 : 0}%` }} />
               </div>
             </div>
             <div>
               <div className="flex justify-between mb-1">
                 <span className="text-sm text-muted-foreground">Filles</span>
-                <span className="text-sm font-medium text-foreground">{filles} ({totalEnfants > 0 ? Math.round((filles / totalEnfants) * 100) : 0}%)</span>
+                <span className="text-sm font-medium text-foreground">{filles} ({totalEnfantsActifs > 0 ? Math.round((filles / totalEnfantsActifs) * 100) : 0}%)</span>
               </div>
               <div className="h-3 bg-muted rounded-full overflow-hidden">
-                <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${totalEnfants > 0 ? (filles / totalEnfants) * 100 : 0}%` }} />
+                <div className="h-full bg-accent rounded-full transition-all" style={{ width: `${totalEnfantsActifs > 0 ? (filles / totalEnfantsActifs) * 100 : 0}%` }} />
               </div>
             </div>
           </div>
