@@ -50,9 +50,11 @@ from app.services.runtime_settings_store import get_max_enfants_par_parent
 from app.services.email_templates import (
     body_desistement_validated_admin,
     body_inscription_admin_notify,
+    body_reinscription_admin_notify,
     body_titulaire,
     subject_desistement_valide_admin,
     subject_inscription_admin_notify,
+    subject_reinscription_admin_notify,
     subject_titulaire,
     # Anciennement pour un désistement « en attente » : subject_desistement_admin, body_desistement_requested_admin.
 )
@@ -189,6 +191,7 @@ def creer_inscription(
 
 @router.post("/inscriptions-n2", response_model=DemandeOut)
 def creer_inscription_non_biologique_n2(
+    background: BackgroundTasks,
     enfant_prenom: str = Form(...),
     enfant_nom: str = Form(...),
     enfant_date_naissance: date = Form(...),
@@ -215,7 +218,7 @@ def creer_inscription_non_biologique_n2(
         .filter(
             Enfant.parent_id == parent.id,
             DemandeInscription.liste_id == liste_p.id,
-            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE)),
+            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE, DemandeStatut.DESISTEE)),
         )
         .first()
         is not None
@@ -226,7 +229,7 @@ def creer_inscription_non_biologique_n2(
         .filter(
             Enfant.parent_id == parent.id,
             DemandeInscription.liste_id == liste_n1.id,
-            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE)),
+            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE, DemandeStatut.DESISTEE)),
         )
         .first()
         is not None
@@ -238,7 +241,7 @@ def creer_inscription_non_biologique_n2(
             Enfant.parent_id == parent.id,
             DemandeInscription.liste_id == liste_n2.id,
             Enfant.lien_parente != LienParente.AUTRE,
-            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE)),
+            DemandeInscription.statut.in_((DemandeStatut.SOUMISE, DemandeStatut.RETENUE, DemandeStatut.DESISTEE)),
         )
         .first()
         is not None
@@ -310,7 +313,27 @@ def creer_inscription_non_biologique_n2(
     db.add(demande)
     db.commit()
     db.refresh(demande)
-    return _to_demande_out(db, demande)
+    out = _to_demande_out(db, demande)
+
+    admin_emails = collect_admin_emails(db)
+    to_admins = uniq_emails(admin_emails)
+    if to_admins:
+        enfant_label = f"{enfant_prenom} {enfant_nom}"
+        enregistrement_when = demande.created_at if demande.created_at is not None else datetime.now(timezone.utc)
+        subject_admin = subject_inscription_admin_notify(parent.matricule, enfant_label)
+        body_admin = body_inscription_admin_notify(
+            parent_matricule=parent.matricule,
+            parent_prenom=parent.prenom,
+            parent_nom=parent.nom,
+            enfant_prenom=enfant_prenom,
+            enfant_nom=enfant_nom,
+            liste=out.liste_code,
+            rang=out.rang_dans_liste,
+            date=enregistrement_when,
+        )
+        background.add_task(send_email, to=to_admins, subject=subject_admin, body=body_admin)
+
+    return out
 
 
 @router.get("/demandes", response_model=list[DemandeOut])
@@ -471,6 +494,7 @@ def definir_titulaire(
     parent = db.query(Parent).filter(Parent.user_id == user.id).first()
     old = None
     new = None
+    demande = None
     if parent:
         enfants = db.query(Enfant).filter(Enfant.parent_id == parent.id).all()
         demande = (
@@ -491,7 +515,9 @@ def definir_titulaire(
     set_titulaire(db=db, user=user, enfant_id_titulaire=payload.enfant_id_titulaire)
     db.commit()
 
-    if parent and new:
+    # Notifier uniquement lors d'un vrai changement de titulaire (ancien -> nouveau).
+    # Cela évite d'envoyer un mail lors de la première affectation du titulaire.
+    if parent and old and new and old != new:
         admin_emails = collect_admin_emails(db)
         to = uniq_emails(admin_emails)
         if to:
@@ -501,17 +527,70 @@ def definir_titulaire(
                 subject=subject_titulaire(parent.matricule),
                 body=body_titulaire(parent_matricule=parent.matricule, new_titulaire=new, old_titulaire=old),
             )
+    elif parent and (not old) and demande is not None:
+        admin_emails = collect_admin_emails(db)
+        to = uniq_emails(admin_emails)
+        if to:
+            out = _to_demande_out(db, demande)
+            # Pour la notification déclenchée au clic de rôle, on affiche l'heure réelle d'envoi.
+            enregistrement_when = datetime.now(timezone.utc)
+            background.add_task(
+                send_email,
+                to=to,
+                subject=subject_inscription_admin_notify(parent.matricule, f"{demande.enfant.prenom} {demande.enfant.nom}"),
+                body=body_inscription_admin_notify(
+                    parent_matricule=parent.matricule,
+                    parent_prenom=parent.prenom,
+                    parent_nom=parent.nom,
+                    enfant_prenom=demande.enfant.prenom,
+                    enfant_nom=demande.enfant.nom,
+                    liste=out.liste_code,
+                    rang=out.rang_dans_liste,
+                    date=enregistrement_when,
+                ),
+            )
     return {"ok": True}
 
 
 @router.post("/suppleant-n1")
 def definir_suppleant_n1(
     payload: TitulaireUpdateIn,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.PARENT)),
 ):
+    parent = db.query(Parent).filter(Parent.user_id == user.id).first()
     set_suppleant_n1(db=db, user=user, enfant_id_suppleant=payload.enfant_id_titulaire)
     db.commit()
+    if parent:
+        demande = (
+            db.query(DemandeInscription)
+            .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+            .filter(DemandeInscription.id == payload.enfant_id_titulaire, Enfant.parent_id == parent.id)
+            .first()
+        )
+        if demande is not None:
+            admin_emails = collect_admin_emails(db)
+            to = uniq_emails(admin_emails)
+            if to:
+                out = _to_demande_out(db, demande)
+                # Pour la notification déclenchée au clic de rôle, on affiche l'heure réelle d'envoi.
+                enregistrement_when = datetime.now(timezone.utc)
+                background.add_task(
+                    send_email,
+                    to=to,
+                    subject=subject_inscription_admin_notify(parent.matricule, f"{demande.enfant.prenom} {demande.enfant.nom}"),
+                    body=body_inscription_admin_notify(
+                        parent_matricule=parent.matricule,
+                        parent_prenom=parent.prenom,
+                        parent_nom=parent.nom,
+                        enfant_prenom=demande.enfant.prenom,
+                        enfant_nom=demande.enfant.nom,
+                        liste=out.liste_code,
+                        rang=out.rang_dans_liste,
+                        date=enregistrement_when,
+                    ),
+                )
     return {"ok": True}
 
 
@@ -571,6 +650,8 @@ def demander_desistement(
             # body_desistement_requested_admin(..., reason=payload.reason).
             body_mail = body_desistement_validated_admin(
                 parent_matricule=parent.matricule,
+                parent_prenom=parent.prenom,
+                parent_nom=parent.nom,
                 enfant=enfant_label,
                 when=now,
             )
@@ -629,6 +710,7 @@ def annuler_desistement(
 
 @router.post("/desistement/{demande_id}/reinscrire", response_model=DemandeOut)
 def reinscrire_enfant_desiste(
+    background: BackgroundTasks,
     demande_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.PARENT)),
@@ -636,7 +718,29 @@ def reinscrire_enfant_desiste(
     demande = reinscrire_desiste(db=db, user=user, demande_id=demande_id)
     db.commit()
     db.refresh(demande)
-    return _to_demande_out(db, demande)
+    out = _to_demande_out(db, demande)
+
+    parent = demande.enfant.parent
+    if parent:
+        admin_emails = collect_admin_emails(db)
+        to_admins = uniq_emails(admin_emails)
+        if to_admins:
+            enfant_label = f"{demande.enfant.prenom} {demande.enfant.nom}"
+            enregistrement_when = demande.updated_at if demande.updated_at is not None else datetime.now(timezone.utc)
+            subject_admin = subject_reinscription_admin_notify(parent.matricule, enfant_label)
+            body_admin = body_reinscription_admin_notify(
+                parent_matricule=parent.matricule,
+                parent_prenom=parent.prenom,
+                parent_nom=parent.nom,
+                enfant_prenom=demande.enfant.prenom,
+                enfant_nom=demande.enfant.nom,
+                liste=out.liste_code,
+                rang=out.rang_dans_liste,
+                date=enregistrement_when,
+            )
+            background.add_task(send_email, to=to_admins, subject=subject_admin, body=body_admin)
+
+    return out
 
 
 def _dt_aware_utc(dt: datetime | None) -> datetime | None:

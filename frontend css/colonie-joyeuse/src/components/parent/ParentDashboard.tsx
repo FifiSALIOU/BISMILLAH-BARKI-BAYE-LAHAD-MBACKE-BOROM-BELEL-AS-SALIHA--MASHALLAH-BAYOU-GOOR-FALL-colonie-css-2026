@@ -209,6 +209,29 @@ export default function ParentDashboard() {
     return (occupeTitulaire ? 1 : 0) + (occupeN1 ? 1 : 0) + (occupeN2 ? 1 : 0);
   }, [enfantsMesEligibles]);
 
+  /**
+   * Historique de saison pour le cap : une place déjà consommée reste comptée
+   * même après désistement validé (règle métier demandée).
+   */
+  const placesListesParentSaisonHistorique = useMemo(() => {
+    const occupeTitulaire = enfantsMesEligibles.some((e) => e.statut === 'Titulaire');
+    const occupeN1 = enfantsMesEligibles.some((e) => e.liste === 'attente_n1');
+    const nonInscritPourCompte = (e: Enfant) =>
+      (e.sansAttributionListe === true && e.lienParente !== 'Autre' && e.statut !== 'Titulaire') ||
+      (e.rangListe == null &&
+        e.liste === 'attente_n2' &&
+        e.lienParente !== 'Autre' &&
+        e.statut !== 'Titulaire');
+    const n2Inscrit = (e: Enfant) =>
+      e.liste === 'attente_n2' &&
+      (
+        e.lienParente === 'Autre' ||
+        !nonInscritPourCompte(e)
+      );
+    const occupeN2 = enfantsMesEligibles.some((e) => n2Inscrit(e));
+    return (occupeTitulaire ? 1 : 0) + (occupeN1 ? 1 : 0) + (occupeN2 ? 1 : 0);
+  }, [enfantsMesEligibles]);
+
   /** Ordre des cartes « Mes enfants » uniquement : Titulaire → N1 → N2 inscrit (bio ou non bio) → le reste (affichage seul). */
   const enfantsMesEligiblesOrdreAffichage = useMemo(() => {
     const nonInscritPourTri = (e: Enfant) =>
@@ -326,7 +349,8 @@ export default function ParentDashboard() {
       e.lienParente !== 'Autre' &&
       e.statut !== 'Titulaire');
 
-  const capListesTitulaireN1Atteint = MAX != null && (placesListesParentSaison >= MAX || limiteMaxDejaAtteinte);
+  const capListesTitulaireN1Atteint =
+    MAX != null && (placesListesParentSaison >= MAX || placesListesParentSaisonHistorique >= MAX || limiteMaxDejaAtteinte);
   const parentAvecEnfantCodifie = enfantsMesEligibles.some((e) => e.lienParente !== 'Autre');
   const desactiverInscriptionNonBio = parentAvecEnfantCodifie && capListesTitulaireN1Atteint;
   const actionsTitulaireN1BloqueesPourCarte = (e: Enfant) =>
@@ -1026,7 +1050,7 @@ export default function ParentDashboard() {
                 */}
                 <p className="text-sm text-muted-foreground">
                   Né(e) le {new Date(enfant.dateNaissance).toLocaleDateString('fr-FR')} — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'}
-                  {enfant.lienParente === 'Autre' ? ' — Enfant non biologique' : ''}
+                  {enfant.lienParente === 'Autre' ? ' — Lien familial : autre' : ''}
                 </p>
                   
                   {/*

@@ -21,6 +21,7 @@ type Row = {
   liste: ListeUi;
   statut: 'Titulaire' | 'Suppléant N1' | 'Suppléant N2';
   dateInscription: string;
+  createdAt?: string | null;
   updatedAt?: string | null;
   parentNom?: string;
   parentPrenom?: string;
@@ -76,6 +77,7 @@ function mapApiRow(d: any): Row | null {
     liste: lu,
     statut: statutLabelFromListeUi(lu),
     dateInscription: d.date_inscription,
+    createdAt: d.created_at ?? d.createdAt ?? null,
     updatedAt: d.updated_at ?? null,
     parentNom: d.parent_nom,
     parentPrenom: d.parent_prenom,
@@ -194,7 +196,7 @@ export default function ListeDemandesDesistees() {
                     <TableCell>{calculateAge(e.dateNaissance)} ans</TableCell>
                     <TableCell className="text-sm">{getListeLabel(e.liste)}</TableCell>
                     <TableCell>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${e.statut === 'Suppléant N1' ? 'bg-accent/10 text-accent border border-accent/20' : 'bg-muted text-muted-foreground'}`}>{e.statut}</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${e.statut === 'Titulaire' ? 'bg-emerald-50 text-emerald-700' : e.statut === 'Suppléant N1' ? 'bg-accent/10 text-accent border border-accent/20' : 'bg-muted text-muted-foreground'}`}>{e.statut}</span>
                     </TableCell>
                     <TableCell className="text-sm">
                       {e.updatedAt
@@ -276,12 +278,18 @@ export default function ListeDemandesDesistees() {
                 </div>
               </div>
               <p className="text-xs text-muted-foreground pt-2 border-t">
-                Inscription :{' '}
-                {new Date(detail.dateInscription).toLocaleDateString('fr-FR', {
-                  day: 'numeric',
-                  month: 'long',
-                  year: 'numeric',
-                })}
+                {(() => {
+                  const rawDate = detail.createdAt || detail.dateInscription;
+                  const dt = new Date(rawDate);
+                  const isValid = !Number.isNaN(dt.getTime());
+                  if (!isValid) return 'Inscription : —';
+                  const datePart = dt.toLocaleDateString('fr-FR', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  });
+                  return `Inscription : ${datePart}`;
+                })()}
               </p>
             </div>
           )}

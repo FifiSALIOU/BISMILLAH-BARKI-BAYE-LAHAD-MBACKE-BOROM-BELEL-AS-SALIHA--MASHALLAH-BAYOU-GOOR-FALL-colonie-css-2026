@@ -634,6 +634,7 @@ def _row_demande_lecture_admin(d: DemandeInscription) -> dict:
         "liste": liste.code.value,
         "rang": d.rang_dans_liste,
         "date_inscription": d.date_inscription,
+        "created_at": d.created_at.isoformat() if d.created_at else None,
         "updated_at": d.updated_at.isoformat() if d.updated_at else None,
         "statut": d.statut.value,
         "is_reinscrit": bool(d.reinscrit_apres_desistement),
@@ -1202,6 +1203,17 @@ def historique_actions(
             details=f"Inscription de {cible} dans {_liste_libelle_journal(d)}",
             cible=cible,
         )
+
+        if bool(d.reinscrit_apres_desistement):
+            _push_event(
+                key=f"reinscription_{d.id}",
+                when=_selection_event_time(d),
+                utilisateur=_parent_nom_journal(parent),
+                role_label="Parent",
+                action="Réinscription",
+                details=f"Réinscription de {cible} après désistement.",
+                cible=cible,
+            )
 
         if d.statut in (DemandeStatut.RETENUE, DemandeStatut.NON_VALIDEE):
             st = _selection_event_time(d)

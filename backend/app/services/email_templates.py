@@ -56,6 +56,35 @@ def body_inscription_admin_notify(
     )
 
 
+def subject_reinscription_admin_notify(parent_matricule: str, enfant_nom: str) -> str:
+    return f"Colonie 2026 — Réinscription (notification) — {parent_matricule} — {enfant_nom}"
+
+
+def body_reinscription_admin_notify(
+    *,
+    parent_matricule: str,
+    parent_prenom: str,
+    parent_nom: str,
+    enfant_prenom: str,
+    enfant_nom: str,
+    liste: str,
+    rang: int,
+    date: datetime,
+):
+    parent_label = f"{parent_prenom} {parent_nom}".strip() or parent_matricule
+    return (
+        "Bonjour,\n\n"
+        f"{parent_label} vient de réinscrire un enfant après désistement sur la plateforme Colonie 2026.\n\n"
+        f"- Matricule parent: {parent_matricule}\n"
+        f"- Parent: {parent_prenom} {parent_nom}\n"
+        f"- Enfant: {enfant_prenom} {enfant_nom}\n"
+        f"- Liste: {liste}\n"
+        f"- Rang: {rang}\n"
+        f"- Date de réinscription: {_dt(date)}\n\n"
+        "Cordialement.\n"
+    )
+
+
 def subject_titulaire(parent_matricule: str) -> str:
     return f"Colonie 2026 — Changement de titulaire ({parent_matricule})"
 
@@ -186,7 +215,7 @@ def body_desistement_validated(*, parent_matricule: str, enfant: str, when: date
     )
 
 
-def body_desistement_validated_admin(*, parent_matricule: str, enfant: str, when: datetime):
+def body_desistement_validated_admin(*, parent_matricule: str, parent_prenom: str, parent_nom: str, enfant: str, when: datetime):
     # Ancien libellé (référence) : « validé depuis l’espace gestionnaire », « liste finale »,
     # « Date de validation » — harmonisé pour couvrir aussi le désistement immédiat depuis l’espace parent.
     return (
@@ -194,6 +223,7 @@ def body_desistement_validated_admin(*, parent_matricule: str, enfant: str, when
         "Un désistement a été enregistré pour la Colonie 2026. "
         "L’enfant concerné ne fait plus partie de la liste active.\n\n"
         f"- Matricule parent: {parent_matricule}\n"
+        f"- Parent: {parent_prenom} {parent_nom}\n"
         f"- Enfant concerné: {enfant}\n"
         f"- Date: {_dt(when)}\n\n"
         "Cordialement.\n"

@@ -72,10 +72,10 @@ export default function Statistiques() {
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold text-foreground">Statistiques</h1>
         <p className="text-muted-foreground mt-1">Données analytiques de la Colonie de Vacances 2026</p>
-        <p className="text-sm text-muted-foreground mt-2 max-w-3xl">
+        {/* <p className="text-sm text-muted-foreground mt-2 max-w-3xl">
           Les indicateurs ci-dessous sont calculés sur les <strong className="text-foreground font-medium">inscriptions actives</strong>{' '}
           (demandes soumises ou retenues) présentes sur les listes Principale, N°1 et N°2 — comme dans la gestion des listes.
-        </p>
+        </p> */}
       </motion.div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
