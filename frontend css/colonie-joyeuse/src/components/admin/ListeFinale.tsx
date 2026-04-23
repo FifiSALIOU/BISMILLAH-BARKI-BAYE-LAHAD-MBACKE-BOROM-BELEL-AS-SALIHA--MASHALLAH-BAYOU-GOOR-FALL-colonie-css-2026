@@ -284,7 +284,7 @@ export default function ListeFinale() {
     const baseHeaders = ['Rang', 'Matricule', 'Nom Parent', 'Prénom Parent', 'Téléphone', 'Service', 'Agence', 'Nom Enfant', 'Prénom Enfant', 'Âge', 'Sexe', 'Statut', "Liste d'origine"];
     const headers = isDesistes ? [...baseHeaders, 'Date du désistement'] : baseHeaders;
     const rows = list.map((e, i) => {
-      const baseRow = [i + 1, e.parentMatricule, e.parentNom || '', e.parentPrenom || '', e.parentTelephone || '', e.parentService || '', e.parentSite || '', e.nom, e.prenom, calculateAge(e.dateNaissance), e.sexe === 'M' ? 'Masculin' : 'Féminin', e.statut, getListeLabel(e.liste)];
+      const baseRow = [i + 1, e.parentMatricule, e.parentNom || '', e.parentPrenom || '', e.parentTelephone || '', e.parentService || '', e.parentSite || '', e.nom, e.prenom, `${calculateAge(e.dateNaissance)} ans`, e.sexe === 'M' ? 'Masculin' : 'Féminin', e.statut, getListeLabel(e.liste)];
       if (isDesistes) {
         baseRow.push(e.dateDesistement ? new Date(e.dateDesistement).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—');
       }

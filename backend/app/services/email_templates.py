@@ -89,13 +89,24 @@ def subject_titulaire(parent_matricule: str) -> str:
     return f"Colonie 2026 — Changement de titulaire ({parent_matricule})"
 
 
-def body_titulaire(*, parent_matricule: str, new_titulaire: str, old_titulaire: str | None):
+def body_titulaire(
+    *,
+    parent_matricule: str,
+    parent_prenom: str,
+    parent_nom: str,
+    new_titulaire: str,
+    old_titulaire: str | None,
+    when: datetime,
+):
+    parent_label = f"{(parent_prenom or '').strip()} {(parent_nom or '').strip()}".strip() or "—"
     return (
         "Bonjour,\n\n"
         "Un changement de titulaire a été effectué.\n\n"
         f"- Matricule: {parent_matricule}\n"
+        f"- Parent: {parent_label}\n"
         f"- Ancien titulaire: {old_titulaire or '—'}\n"
-        f"- Nouveau titulaire: {new_titulaire}\n\n"
+        f"- Nouveau titulaire: {new_titulaire}\n"
+        f"- Date et heure: {when.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
         "Cordialement.\n"
     )
 

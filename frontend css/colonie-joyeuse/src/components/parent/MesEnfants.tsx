@@ -179,11 +179,13 @@ export default function MesEnfants() {
                     </span>
                   )}
 
-                  {/* Soumise sans refus : plus d’affichage « attente de validation ». Ancien bloc conservé en commentaire :
-                  {(enfant.validation || 'en_attente') === 'en_attente' && !enfant.desistement && (
-                    <span className="text-xs font-medium px-3 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">⏳ En attente de validation</span>
+                  {(enfant.validation || 'en_attente') === 'en_attente' &&
+                    enfant.liste === 'attente_n2' &&
+                    enfant.lienParente === 'Autre' && (
+                    <span className="text-xs font-medium px-3 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200">
+                      En attente de validation
+                    </span>
                   )}
-                  */}
 
                   {enfant.validation === 'refusé' && enfant.rejetDefinitif && (
                     <div className="w-full max-w-md rounded-lg border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs text-destructive space-y-1.5 sm:ml-auto">

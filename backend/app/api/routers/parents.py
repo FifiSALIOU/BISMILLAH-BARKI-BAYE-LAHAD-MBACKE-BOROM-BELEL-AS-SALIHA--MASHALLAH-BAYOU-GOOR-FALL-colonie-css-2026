@@ -525,7 +525,14 @@ def definir_titulaire(
                 send_email,
                 to=to,
                 subject=subject_titulaire(parent.matricule),
-                body=body_titulaire(parent_matricule=parent.matricule, new_titulaire=new, old_titulaire=old),
+                body=body_titulaire(
+                    parent_matricule=parent.matricule,
+                    parent_prenom=parent.prenom,
+                    parent_nom=parent.nom,
+                    new_titulaire=new,
+                    old_titulaire=old,
+                    when=datetime.now(timezone.utc),
+                ),
             )
     elif parent and (not old) and demande is not None:
         admin_emails = collect_admin_emails(db)

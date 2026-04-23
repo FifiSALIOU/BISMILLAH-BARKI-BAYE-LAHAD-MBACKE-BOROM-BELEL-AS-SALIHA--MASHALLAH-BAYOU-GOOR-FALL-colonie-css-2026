@@ -51,6 +51,12 @@ function serviceValueForSelect(raw: string, catalog: Array<{ nom: string }>): st
   return fold ? fold.nom : t;
 }
 
+function telephoneTableauParent(v: string | undefined): string {
+  const t = (v || '').trim();
+  if (!t || t === '-') return '—';
+  return t.startsWith('tel:') ? t.slice(4) : t;
+}
+
 /** Filtre local : une sous-chaîne suffit sur l’un des champs (insensible à la casse). */
 function matchesUserFilter(parts: string[], query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -679,6 +685,7 @@ export default function GestionUtilisateurs() {
                   <TableHead className="font-semibold">Prénom</TableHead>
                   <TableHead className="font-semibold">Agence</TableHead>
                   <TableHead className="font-semibold">Service</TableHead>
+                  <TableHead className="font-semibold">Téléphone</TableHead>
                   <TableHead className="font-semibold tabular-nums">Enfants</TableHead>
                   <TableHead className="font-semibold">Statut</TableHead>
                   <TableHead className="font-semibold">Actions</TableHead>
@@ -687,7 +694,7 @@ export default function GestionUtilisateurs() {
               <TableBody>
                 {filteredParents.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                    <TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">
                       {parents.length === 0
                         ? 'Aucun parent enregistré.'
                         : 'Aucun parent ne correspond au filtre.'}
@@ -703,6 +710,7 @@ export default function GestionUtilisateurs() {
                       {sites.find((s) => String(s.code) === String(p.site || p.site_code || ''))?.nom || (p.site || p.site_code || '-')}
                     </TableCell>
                     <TableCell className="text-sm">{p.service}</TableCell>
+                    <TableCell className="text-sm tabular-nums">{telephoneTableauParent(p.telephone)}</TableCell>
                     <TableCell className="tabular-nums text-sm text-center">{p.nbEnfants}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">

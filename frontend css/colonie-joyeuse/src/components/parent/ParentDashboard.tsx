@@ -633,9 +633,18 @@ export default function ParentDashboard() {
         </span>
       );
     }
-    /* Soumise sans refus : plus de badge « attente de validation ». Ancien rendu conservé en commentaire :
-    return <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">⏳ Informations en attente de validation</span>;
-    */
+    /** Suppléant N2 + lien « Autre » : tant que le gestionnaire n’a ni validé ni refusé. Titulaire / N1 / autres cas : inchangé (pas de badge ici). */
+    if (
+      (enfant.validation || 'en_attente') === 'en_attente' &&
+      enfant.liste === 'attente_n2' &&
+      enfant.lienParente === 'Autre'
+    ) {
+      return (
+        <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
+          En attente de validation
+        </span>
+      );
+    }
     return null;
   };
 
@@ -1009,7 +1018,8 @@ export default function ParentDashboard() {
                             Suppléant N1
                           </Button>
                         )}
-                        {MAX != null && MAX >= 3 && enfant.sansAttributionListe === true && (
+                        {/* Max = 3 : pas de bouton N2 sur les cartes biologiques — le 3ᵉ rôle passe par « Ajouter un enfant (lien Autre) ». */}
+                        {MAX != null && MAX > 3 && enfant.sansAttributionListe === true && (
                           <Button
                             variant="outline"
                             size="sm"
@@ -1050,6 +1060,11 @@ export default function ParentDashboard() {
                 */}
                 <p className="text-sm text-muted-foreground">
                   Né(e) le {new Date(enfant.dateNaissance).toLocaleDateString('fr-FR')} — {enfant.sexe === 'M' ? 'Garçon' : 'Fille'}
+                  {(enfant.statut === 'Titulaire' ||
+                    enfant.statut === 'Suppléant N1' ||
+                    (isNonInscrit(enfant) && enfant.lienParente !== 'Autre'))
+                    ? ` — Lien de parenté : ${enfant.lienParente}`
+                    : ''}
                   {enfant.lienParente === 'Autre' ? ' — Lien familial : autre' : ''}
                 </p>
                   
@@ -1082,7 +1097,7 @@ export default function ParentDashboard() {
                     </div>
                   )}
 
-                  {/* Validation badge (rien si soumise sans refus) */}
+                  {/* Validation : N2 + Autre → attente ; validé / refusé inchangé */}
                   {getValidationBadge(enfant)}
                   {enfant.validation === 'refusé' && enfant.rejetDefinitif && (
                     <div className="inline-block rounded-md border border-destructive/25 bg-destructive/10 px-3 py-2 text-xs text-destructive space-y-1.5 max-w-md">
@@ -1333,7 +1348,8 @@ export default function ParentDashboard() {
               <DialogTitle className="text-foreground">Limite atteinte</DialogTitle>
             </div>
             <DialogDescription className="pt-2 text-sm text-muted-foreground">
-              Vous avez atteint le nombre maximum d&apos;inscriptions autorisées (2 enfants) pour la Colonie de Vacances
+              Vous avez atteint le nombre maximum d&apos;inscriptions autorisées (
+              {(MAX ?? 2)} enfant{(MAX ?? 2) > 1 ? 's' : ''}) pour la Colonie de Vacances
               2026.
             </DialogDescription>
           </DialogHeader>
