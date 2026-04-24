@@ -620,17 +620,33 @@ def demander_desistement(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.PARENT)),
 ):
+    def _label_liste_desistement(code: str | None) -> str:
+        mapping = {
+            "PRINCIPALE": "Liste principale",
+            "ATTENTE_N1": "Liste d'attente N°1",
+            "ATTENTE_N2": "Liste d'attente N°2",
+        }
+        return mapping.get((code or "").strip().upper(), (code or "").strip())
+
     parent = db.query(Parent).filter(Parent.user_id == user.id).first()
     enfant_label = ""
+    liste_origine_label = "Non déterminée"
     if parent:
         d = (
             db.query(DemandeInscription)
+            .options(joinedload(DemandeInscription.liste))
             .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
             .filter(DemandeInscription.id == demande_id, Enfant.parent_id == parent.id)
             .first()
         )
         if d:
             enfant_label = f"{d.enfant.prenom} {d.enfant.nom}"
+            if d.liste is not None and d.liste.code is not None:
+                liste_origine_label = _label_liste_desistement(d.liste.code.value)
+            elif d.liste_id is not None:
+                liste_row = db.query(Liste).filter(Liste.id == d.liste_id).first()
+                if liste_row is not None and liste_row.code is not None:
+                    liste_origine_label = _label_liste_desistement(liste_row.code.value)
 
     request_desistement(db=db, user=user, demande_id=demande_id, reason=payload.reason)
     db.commit()
@@ -661,7 +677,12 @@ def demander_desistement(
                 parent_nom=parent.nom,
                 enfant=enfant_label,
                 when=now,
+                liste_origine=liste_origine_label,
             )
+            # Garde-fou: s'assurer que la ligne "Liste d’origine" est bien présente
+            # dans le mail, même en cas de template ancien chargé en mémoire.
+            if "Liste d’origine:" not in body_mail and "Liste d'origine:" not in body_mail:
+                body_mail = body_mail.rstrip() + f"\n- Liste d’origine: {liste_origine_label}\n"
             reason = (payload.reason or "").strip()
             if reason:
                 body_mail = body_mail.rstrip() + f"\n\nMotif indiqué par le parent : {reason}\n"

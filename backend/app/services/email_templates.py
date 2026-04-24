@@ -226,9 +226,18 @@ def body_desistement_validated(*, parent_matricule: str, enfant: str, when: date
     )
 
 
-def body_desistement_validated_admin(*, parent_matricule: str, parent_prenom: str, parent_nom: str, enfant: str, when: datetime):
+def body_desistement_validated_admin(
+    *,
+    parent_matricule: str,
+    parent_prenom: str,
+    parent_nom: str,
+    enfant: str,
+    when: datetime,
+    liste_origine: str | None = None,
+):
     # Ancien libellé (référence) : « validé depuis l’espace gestionnaire », « liste finale »,
     # « Date de validation » — harmonisé pour couvrir aussi le désistement immédiat depuis l’espace parent.
+    liste_affichee = (liste_origine or "").strip() or "Non déterminée"
     return (
         "Bonjour,\n\n"
         "Un désistement a été enregistré pour la Colonie 2026. "
@@ -236,6 +245,7 @@ def body_desistement_validated_admin(*, parent_matricule: str, parent_prenom: st
         f"- Matricule parent: {parent_matricule}\n"
         f"- Parent: {parent_prenom} {parent_nom}\n"
         f"- Enfant concerné: {enfant}\n"
+        f"- Liste d’origine: {liste_affichee}\n"
         f"- Date: {_dt(when)}\n\n"
         "Cordialement.\n"
     )

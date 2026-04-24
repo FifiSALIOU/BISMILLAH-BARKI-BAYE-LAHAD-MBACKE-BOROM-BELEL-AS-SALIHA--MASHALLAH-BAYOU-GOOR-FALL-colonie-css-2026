@@ -637,7 +637,8 @@ export default function ParentDashboard() {
     if (
       (enfant.validation || 'en_attente') === 'en_attente' &&
       enfant.liste === 'attente_n2' &&
-      enfant.lienParente === 'Autre'
+      enfant.lienParente === 'Autre' &&
+      !enfant.desistement
     ) {
       return (
         <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200">
@@ -1186,6 +1187,12 @@ export default function ParentDashboard() {
       {/* Inscription Dialog */}
       <Dialog open={inscrireOpen} onOpenChange={(open) => { setInscrireOpen(open); if (!open) setInscrireNonBioMode(false); }}>
         <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>{inscrireNonBioMode ? 'Ajouter un enfant (lien Autre)' : 'Inscrire un enfant'}</DialogTitle>
+            <DialogDescription>
+              Formulaire d&apos;inscription enfant. Les règles de rôles et de rang restent inchangées.
+            </DialogDescription>
+          </DialogHeader>
           <InscrireEnfant
             onClose={() => { setInscrireOpen(false); setInscrireNonBioMode(false); }}
             nbEnfantsInscrits={enfants.length}

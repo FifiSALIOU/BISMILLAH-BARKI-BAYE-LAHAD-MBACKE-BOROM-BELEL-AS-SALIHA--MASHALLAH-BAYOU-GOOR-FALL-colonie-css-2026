@@ -16,6 +16,13 @@ type RecentActivityRow = {
   date_inscription: string;
 };
 
+/** Même règle que la page « Liste finale » : pas de retenus affichés tant que les inscriptions ne sont pas clôturées. */
+function areInscriptionsClosed(cfg: { dateFinInscriptions?: string | null }): boolean {
+  if (!cfg?.dateFinInscriptions) return false;
+  const dateFin = new Date(`${cfg.dateFinInscriptions}T23:59:59`);
+  return new Date() > dateFin;
+}
+
 export default function AdminDashboard() {
   const { enfants, settings } = useInscription();
   const { token } = useAuth();
@@ -56,7 +63,14 @@ export default function AdminDashboard() {
     : enfants.filter(e => e.liste === 'attente_n2').length;
   const total = principale + n1 + n2;
   const totalParents = statsApi?.total_parents ?? new Set(enfants.map(e => e.parentMatricule)).size;
-  const listeFinaleCount = statsApi?.selected_total ?? 0;
+  /** Aligné sur l’écran Liste finale : total P+N1+N2 (SOUMISE/RETENUE), tronqué par la capacité — pas `selected_total` API qui peut diverger. */
+  const inscriptionsCloturees = areInscriptionsClosed(settings);
+  const capFinale = settings.capaciteMax;
+  const listeFinaleCount = !inscriptionsCloturees
+    ? 0
+    : capFinale != null
+      ? Math.min(total, capFinale)
+      : total;
   const desistementsEffectifs = statsApi?.desistements_waiting ?? enfants.filter(e => e.desistement === 'validé').length;
 
   const capaciteLabel = settings.capaciteMax !== null ? settings.capaciteMax : '∞';

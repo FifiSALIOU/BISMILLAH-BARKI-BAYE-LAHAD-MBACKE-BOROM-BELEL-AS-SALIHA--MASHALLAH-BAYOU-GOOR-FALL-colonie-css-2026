@@ -196,7 +196,7 @@ export default function ListeDemandesDesistees() {
                     <TableCell>{calculateAge(e.dateNaissance)} ans</TableCell>
                     <TableCell className="text-sm">{getListeLabel(e.liste)}</TableCell>
                     <TableCell>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${e.statut === 'Titulaire' ? 'bg-emerald-50 text-emerald-700' : e.statut === 'Suppléant N1' ? 'bg-accent/10 text-accent border border-accent/20' : 'bg-muted text-muted-foreground'}`}>{e.statut}</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${e.statut === 'Titulaire' ? 'bg-emerald-50 text-emerald-700' : e.statut === 'Suppléant N1' ? 'bg-accent/10 text-accent border border-accent/20' : 'bg-primary/10 text-primary'}`}>{e.statut}</span>
                     </TableCell>
                     <TableCell className="text-sm">
                       {e.updatedAt

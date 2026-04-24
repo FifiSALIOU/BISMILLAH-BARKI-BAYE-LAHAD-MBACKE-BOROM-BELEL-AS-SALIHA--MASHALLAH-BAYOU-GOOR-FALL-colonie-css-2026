@@ -1,10 +1,10 @@
 {
   "colonieNom": "Colonie de Vacances 2026",
   "dateDebutInscriptions": "2026-01-01",
-  "dateFinInscriptions": "2026-07-30",
+  "dateFinInscriptions": "2026-03-30",
   "dateDebutColonie": "2026-07-01",
   "dateFinColonie": "",
-  "capaciteMax": 27,
+  "capaciteMax": 100,
   "maxEnfantsParParent": 3,
   "ageMin": 2012,
   "ageMax": 2019,

@@ -446,13 +446,15 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
               <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center"><AlertTriangle className="w-5 h-5 text-amber-700" /></div>
               <DialogTitle className="text-foreground">Vous avez atteint la limite</DialogTitle>
             </div>
-            <DialogDescription className="pt-2 space-y-2 text-left">
-              <p>
-                L&apos;inscription de <strong className="text-foreground">{nonBioLimiteEnfantLabel}</strong> est bien enregistrée (liste d&apos;attente N°2).
-              </p>
-              <p className="text-foreground font-medium">
-                Vous ne pouvez plus inscrire d&apos;autre enfant non biologique : une seule inscription est autorisée lorsque vous n&apos;avez pas d&apos;enfant codifié.
-              </p>
+            <DialogDescription asChild>
+              <div className="pt-2 space-y-2 text-left">
+                <p>
+                  L&apos;inscription de <strong className="text-foreground">{nonBioLimiteEnfantLabel}</strong> est bien enregistrée (liste d&apos;attente N°2).
+                </p>
+                <p className="text-foreground font-medium">
+                  Vous ne pouvez plus inscrire d&apos;autre enfant non biologique : une seule inscription est autorisée lorsque vous n&apos;avez pas d&apos;enfant codifié.
+                </p>
+              </div>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
