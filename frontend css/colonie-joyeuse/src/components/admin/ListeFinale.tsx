@@ -337,12 +337,13 @@ export default function ListeFinale() {
             <TableHead className="font-semibold">Statut</TableHead>
             <TableHead className="font-semibold">Liste d'origine</TableHead>
             {isDesistes && <TableHead className="font-semibold">Date du désistement</TableHead>}
+            {isDesistes && <TableHead className="font-semibold">Heure du désistement</TableHead>}
             <TableHead className="font-semibold">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {list.length === 0 ? (
-            <TableRow><TableCell colSpan={isDesistes ? 15 : 14} className="text-center py-12 text-muted-foreground">Aucun enfant</TableCell></TableRow>
+            <TableRow><TableCell colSpan={isDesistes ? 16 : 14} className="text-center py-12 text-muted-foreground">Aucun enfant</TableCell></TableRow>
           ) : (
             list.map((e, i) => {
               const p = { nom: e.parentNom, prenom: e.parentPrenom, telephone: e.parentTelephone, service: e.parentService, site: e.parentSite };
@@ -367,6 +368,7 @@ export default function ListeFinale() {
                   <TableCell><span className={`text-xs font-medium px-2 py-0.5 rounded-md ${getStatutBadge(e.statut)}`}>{e.statut}</span></TableCell>
                   <TableCell><span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground">{getListeLabel(e.liste)}</span></TableCell>
                   {isDesistes && <TableCell className="text-sm">{e.dateDesistement ? new Date(e.dateDesistement).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</TableCell>}
+                  {isDesistes && <TableCell className="text-sm">{e.dateDesistement ? new Date(e.dateDesistement).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</TableCell>}
                   <TableCell>
                     <div className="flex gap-1 flex-wrap">
                       {showDesistAction && e.desistement === 'demandé' && (
@@ -507,7 +509,7 @@ export default function ListeFinale() {
           {enfantsDesistes.length > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
               <p className="text-xs text-amber-800">
-                <strong>⚠️ Attention :</strong> Ces enfants étaient dans la liste finale mais leurs parents ont demandé un désistement. Validez le désistement pour retirer l'enfant. La liste se complétera automatiquement avec l'enfant suivant.
+                <strong>⚠️ Attention :</strong> Ces enfants étaient dans la liste finale mais leurs parents ont demandé un désistement. La liste se complétera automatiquement avec l'enfant suivant.
               </p>
             </div>
           )}
