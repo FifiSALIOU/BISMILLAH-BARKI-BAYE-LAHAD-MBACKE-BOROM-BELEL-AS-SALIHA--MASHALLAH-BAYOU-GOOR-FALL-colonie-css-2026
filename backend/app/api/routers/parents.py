@@ -344,8 +344,11 @@ def mes_demandes(
     parent = db.query(Parent).filter(Parent.user_id == user.id).first()
     if not parent:
         return []
-    auto_sync_enfants_eligibles_du_parent(db=db, user=user)
-    db.commit()
+    # Après validation définitive, les mutations sont verrouillées.
+    # On conserve toutefois la lecture des demandes pour que le parent voie sa vue finale.
+    if not liste_finale_definitive_validee():
+        auto_sync_enfants_eligibles_du_parent(db=db, user=user)
+        db.commit()
     demandes = (
         db.query(DemandeInscription)
         .options(joinedload(DemandeInscription.desistement))

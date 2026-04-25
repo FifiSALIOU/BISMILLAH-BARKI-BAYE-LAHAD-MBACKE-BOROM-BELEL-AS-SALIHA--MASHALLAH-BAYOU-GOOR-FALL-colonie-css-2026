@@ -10,6 +10,6 @@
   "ageMax": 2019,
   "inscriptionsOuvertes": true,
   "accesParentsActif": true,
-  "listeFinalePretePourValidation": false,
-  "listeFinaleValideeDefinitive": false
+  "listeFinalePretePourValidation": true,
+  "listeFinaleValideeDefinitive": true
 }

@@ -50,6 +50,8 @@ def demandes_liste_finale_retenus_si_cloturees(db: Session) -> list[DemandeInscr
             joinedload(DemandeInscription.enfant).joinedload(Enfant.parent),
             joinedload(DemandeInscription.liste),
         )
+        # Exclut les demandes "vierges" (créées sans liste) qui ne font pas partie d'une liste finale.
+        .filter(DemandeInscription.liste_id.isnot(None))
         .filter(DemandeInscription.statut != DemandeStatut.NON_VALIDEE)
         .filter(DemandeInscription.statut != DemandeStatut.DESISTEE)
         .all()
