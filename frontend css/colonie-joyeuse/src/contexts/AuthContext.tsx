@@ -58,14 +58,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     if (res.must_change_password) {
       setAuthStep('force_password_change');
+      setToken(res.access_token);
+      const me = await apiRequest<any>('/auth/me', { token: res.access_token });
+      const p = me.parent || {};
       setPendingParent({
-        matricule,
-        prenom: '',
-        nom: '',
-        service: '',
+        matricule: p.matricule || me.matricule || matricule,
+        prenom: p.prenom || '',
+        nom: p.nom || '',
+        service: p.service || '',
+        site: p.site_code || undefined,
+        site_code: p.site_code || undefined,
+        site_nom: p.site_nom || undefined,
+        email: p.email || undefined,
+        telephone: p.telephone || undefined,
         motDePasse: '',
       });
-      setToken(res.access_token);
       return;
     }
     setToken(res.access_token);
