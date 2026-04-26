@@ -17,8 +17,8 @@ interface AuthContextType {
   setAuthStep: (step: AuthStep) => void;
   pendingParent: Parent | null;
   setPendingParent: (p: Parent | null) => void;
-  pendingAdminFirstLogin: { email: string; token: string } | null;
-  setPendingAdminFirstLogin: (v: { email: string; token: string } | null) => void;
+  pendingAdminFirstLogin: { email: string; token: string; name: string } | null;
+  setPendingAdminFirstLogin: (v: { email: string; token: string; name: string } | null) => void;
   refreshParentProfile: () => Promise<void>;
 }
 
@@ -31,7 +31,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [authStep, setAuthStep] = useState<AuthStep>('logged_out');
   const [pendingParent, setPendingParent] = useState<Parent | null>(null);
-  const [pendingAdminFirstLogin, setPendingAdminFirstLogin] = useState<{ email: string; token: string } | null>(null);
+  const [pendingAdminFirstLogin, setPendingAdminFirstLogin] = useState<{ email: string; token: string; name: string } | null>(null);
 
   const refreshParentProfile = async () => {
     if (!token || role !== 'parent') return;
@@ -101,7 +101,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       body: JSON.stringify({ email, password }),
     });
     if (res.must_change_password) {
-      setPendingAdminFirstLogin({ email, token: res.access_token });
+      let adminDisplayName = email;
+      try {
+        const me = await apiRequest<{ name?: string | null }>('/auth/me', { token: res.access_token });
+        const n = (me?.name || '').trim();
+        if (n) adminDisplayName = n;
+      } catch {
+        /* affichage : repli sur l’e-mail de connexion */
+      }
+      setPendingAdminFirstLogin({ email, token: res.access_token, name: adminDisplayName });
       setToken(res.access_token);
       setAuthStep('force_password_change');
       return;

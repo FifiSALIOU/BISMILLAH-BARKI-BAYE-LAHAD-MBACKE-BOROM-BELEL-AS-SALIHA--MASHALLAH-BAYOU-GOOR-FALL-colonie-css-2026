@@ -85,6 +85,10 @@ export default function GestionListe({ type }: Props) {
   const [previewMime, setPreviewMime] = useState('');
   const [previewName, setPreviewName] = useState('');
   const [refreshTick, setRefreshTick] = useState(0);
+  /** Verrou affichage uniquement liste N2 : après validation définitive de la liste finale. */
+  const [listeFinaleValideeDefinitive, setListeFinaleValideeDefinitive] = useState(false);
+
+  const n2ActionsLocked = type === 'attente_n2' && listeFinaleValideeDefinitive;
 
   const titles: Record<string, string> = {
     principale: 'Liste Principale',
@@ -109,6 +113,16 @@ export default function GestionListe({ type }: Props) {
 
   // Transfer only allowed from principale/N1 to N2
   const canTransfer = type === 'principale' || type === 'attente_n1';
+
+  useEffect(() => {
+    if (!token || type !== 'attente_n2') {
+      setListeFinaleValideeDefinitive(false);
+      return;
+    }
+    apiRequest<any>('/admin/settings', { token })
+      .then((cfg) => setListeFinaleValideeDefinitive(!!cfg?.listeFinaleValideeDefinitive))
+      .catch(() => setListeFinaleValideeDefinitive(false));
+  }, [token, type, refreshTick]);
 
   useEffect(() => {
     if (!token) return;
@@ -217,7 +231,7 @@ export default function GestionListe({ type }: Props) {
   };
 
   const handleValiderDesistement = async () => {
-    if (!desistTarget) return;
+    if (!desistTarget || n2ActionsLocked) return;
     const desistementId = desistementsByDemande[desistTarget.demandeId];
     if (!desistementId) return;
     await apiRequest(`/admin/desistements/${desistementId}/valider`, {
@@ -249,7 +263,7 @@ export default function GestionListe({ type }: Props) {
    */
 
   const handleRefuser = async () => {
-    if (!token || !refusTarget || !motifRefus.trim()) return;
+    if (!token || !refusTarget || !motifRefus.trim() || n2ActionsLocked) return;
     const chainDefinitif = refusEnsuiteDefinitifN2;
     const id = refusTarget.demandeId;
     const motif = motifRefus.trim();
@@ -324,7 +338,7 @@ export default function GestionListe({ type }: Props) {
   }, [previewOpen, previewUrl]);
 
   const handleValiderJustificatif = async (enfant: Enfant) => {
-    if (!token) return;
+    if (!token || n2ActionsLocked) return;
     await apiRequest(`/admin/demandes/${enfant.demandeId}/valider-justificatif`, {
       method: 'POST',
       token,
@@ -389,6 +403,17 @@ export default function GestionListe({ type }: Props) {
             <Button onClick={exportExcel} variant="outline" className="gap-2 rounded-lg"><FileDown className="w-4 h-4" />Export Excel</Button>
             <Button onClick={exportPDF} variant="outline" className="gap-2 rounded-lg"><FileDown className="w-4 h-4" />Export PDF</Button>
           </div>
+        </motion.div>
+      )}
+
+      {!showFullDetail && n2ActionsLocked && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+          role="status"
+        >
+          Liste finale validée définitivement — actions désactivées
         </motion.div>
       )}
 
@@ -513,7 +538,12 @@ export default function GestionListe({ type }: Props) {
                           )}
                           */}
                           {e.desistement === 'demandé' && (
-                            <Button size="sm" onClick={() => { setDesistTarget(e); setConfirmDesistOpen(true); }} className="gap-1 text-xs rounded-lg bg-accent hover:bg-accent/90 text-white h-7 px-2">
+                            <Button
+                              size="sm"
+                              disabled={n2ActionsLocked}
+                              onClick={() => { setDesistTarget(e); setConfirmDesistOpen(true); }}
+                              className="gap-1 text-xs rounded-lg bg-accent hover:bg-accent/90 text-white h-7 px-2"
+                            >
                               <CheckCircle2 className="w-3 h-3" />Valider désist.
                             </Button>
                           )}
@@ -531,11 +561,17 @@ export default function GestionListe({ type }: Props) {
                           */}
                           {type === 'attente_n2' && !!e.justificatifNomFichier && e.justificatifValide == null && (
                             <>
-                              <Button size="sm" onClick={() => handleValiderJustificatif(e)} className="gap-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3">
+                              <Button
+                                size="sm"
+                                disabled={n2ActionsLocked}
+                                onClick={() => handleValiderJustificatif(e)}
+                                className="gap-1 text-xs rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white h-8 px-3"
+                              >
                                 <CheckCircle2 className="w-3 h-3" />Valider
                               </Button>
                               <Button
                                 size="sm"
+                                disabled={n2ActionsLocked}
                                 onClick={() => {
                                   setRefusEnsuiteDefinitifN2(true);
                                   setRefusTarget(e);
@@ -566,6 +602,11 @@ export default function GestionListe({ type }: Props) {
 
       {showFullDetail && detailEnfant && (
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="bg-card rounded-xl shadow-card border border-border p-6 space-y-5">
+          {n2ActionsLocked && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950" role="status">
+              Liste finale validée définitivement — actions désactivées
+            </div>
+          )}
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-xl font-bold text-foreground">Détails complets de la demande</h2>
@@ -715,7 +756,7 @@ export default function GestionListe({ type }: Props) {
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmDesistOpen(false)} className="rounded-lg">Annuler</Button>
-            <Button onClick={handleValiderDesistement} className="rounded-lg bg-accent text-white hover:bg-accent/90">Valider le désistement</Button>
+            <Button onClick={handleValiderDesistement} disabled={n2ActionsLocked} className="rounded-lg bg-accent text-white hover:bg-accent/90">Valider le désistement</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -755,7 +796,7 @@ export default function GestionListe({ type }: Props) {
             >
               Annuler
             </Button>
-            <Button onClick={handleRefuser} disabled={!motifRefus.trim()} className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90">Refuser</Button>
+            <Button onClick={handleRefuser} disabled={!motifRefus.trim() || n2ActionsLocked} className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90">Refuser</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

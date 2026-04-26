@@ -112,28 +112,28 @@ def body_titulaire(
 
 
 def subject_selection(parent_matricule: str, enfant_nom: str) -> str:
-    return f"Colonie 2026 — Validation des informations ({parent_matricule}) — {enfant_nom}"
+    return f"Colonie 2026 — Contrôle d’une demande ({parent_matricule}) — {enfant_nom}"
 
 
 def body_selection(*, parent_matricule: str, enfant: str, selected: bool, when: datetime):
-    """Courriel après « Approuver » / « Refuser » côté gestionnaire : contrôle de conformité des infos, pas la liste finale."""
+    """Notification interne (gestionnaires / super admins) après « Approuver » / « Refuser » : pas la liste finale."""
     if selected:
-        suite = (
-            "Les informations de cette demande ont été contrôlées et jugées conformes par l’administration.\n"
-            "Cela ne signifie pas que l’enfant figure dans la liste finale des retenus : celle-ci est établie automatiquement après la clôture des inscriptions.\n"
-        )
+        # Cela ne signifie pas que l’enfant figure dans la liste finale des retenus : celle-ci est établie automatiquement après la clôture des inscriptions.
+        suite = ("Les informations ont été jugées conformes lors du contrôle.\n")
     else:
+        # Si la demande est transférée vers une autre liste, un e-mail de transfert sera également envoyé aux mêmes destinataires d’alerte.
         suite = (
-            "Les informations de cette demande n’ont pas été jugées conformes par l’administration.\n"
-            "Un motif a été enregistré. Si la demande est transférée vers une autre liste, vous recevrez aussi un e-mail de transfert.\n"
+            "Les informations n’ont pas été jugées conformes lors du contrôle.\n"
+            "Un motif a été enregistré.\n"
         )
     return (
         "Bonjour,\n\n"
-        "Mise à jour concernant le contrôle des informations de votre demande d’inscription.\n\n"
-        f"- Matricule: {parent_matricule}\n"
-        f"- Enfant: {enfant}\n"
-        f"- Décision: {'informations conformes' if selected else 'informations non conformes'}\n"
-        f"- Date: {_dt(when)}\n\n"
+        "Ceci est une notification automatique à l’attention des gestionnaires et super administrateurs.\n\n"
+        "Résumé du contrôle des informations d’une demande d’inscription :\n\n"
+        f"- Matricule parent : {parent_matricule}\n"
+        f"- Enfant : {enfant}\n"
+        f"- Décision : {'informations conformes' if selected else 'informations non conformes'}\n"
+        f"- Date : {_dt(when)}\n\n"
         f"{suite}\n"
         "Cordialement.\n"
     )
