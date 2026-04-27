@@ -465,7 +465,6 @@ def set_titulaire(*, db: Session, user: User, enfant_id_titulaire: int) -> None:
     nouvelle_demande = demande_by_enfant_id.get(int(enfant_titulaire.id))
     if ancienne_demande is None or nouvelle_demande is None:
         return
-    nouvelle_demande.date_inscription = date.today()
 
     for d in (ancienne_demande, nouvelle_demande):
         _require_not_rejet_definitif(d)
@@ -731,6 +730,7 @@ def reinscrire_desiste(*, db: Session, user: User, demande_id: int) -> DemandeIn
         demande.statut = DemandeStatut.SOUMISE
     demande.non_validation_reason = ""
     demande.reinscrit_apres_desistement = True
+    demande.date_inscription = date.today()
     demande.updated_at = datetime.now(timezone.utc)
     db.flush()
     resequence_rangs_pour_liste(db, int(demande.liste_id), demande_reinscrite_id=int(demande.id))

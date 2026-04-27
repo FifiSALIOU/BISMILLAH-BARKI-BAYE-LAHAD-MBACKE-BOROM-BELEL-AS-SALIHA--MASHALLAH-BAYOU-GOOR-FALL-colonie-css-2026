@@ -279,7 +279,7 @@ export default function ListeDemandesDesistees() {
               </div>
               <p className="text-xs text-muted-foreground pt-2 border-t">
                 {(() => {
-                  const rawDate = detail.createdAt || detail.dateInscription;
+                  const rawDate = detail.dateInscription;
                   const dt = new Date(rawDate);
                   const isValid = !Number.isNaN(dt.getTime());
                   if (!isValid) return 'Inscription : —';
