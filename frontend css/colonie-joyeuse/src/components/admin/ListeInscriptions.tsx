@@ -16,6 +16,7 @@ type Row = {
   demandeId: number;
   /** `rang_dans_liste` côté API — même règle que la gestion des listes */
   rang: number;
+  inscriptionAt?: string | null;
   updatedAt?: string | null;
   reinscrit?: boolean;
   // desistementValide: boolean;
@@ -64,6 +65,7 @@ export default function ListeInscriptions() {
             id: String(d.demande_id),
             demandeId: d.demande_id,
             rang: Number(d.rang) || 0,
+            inscriptionAt: d.inscription_at ?? null,
             updatedAt: d.updated_at ?? null,
             reinscrit: !!d.is_reinscrit,
             // desistementValide: String(d.statut || '') === 'DESISTEE',
@@ -122,9 +124,25 @@ export default function ListeInscriptions() {
   });
 
   const generateData = () => {
-    const headers = ['Rang', 'Matricule', 'Nom Parent', 'Prénom Parent', 'Service', 'Agence', 'Nom Enfant', 'Prénom Enfant', 'Âge', 'Sexe', 'Statut', 'Liste', 'Inscrit le'];
+    const headers = ['Rang', 'Matricule', 'Nom Parent', 'Prénom Parent', 'Service', 'Agence', 'Nom Enfant', 'Prénom Enfant', 'Âge', 'Sexe', 'Statut', 'Liste', 'Inscrit le', 'Heure inscription'];
     const dataRows = filtered.map((e) => {
-      return [e.rang, e.parentMatricule, e.parentNom || '', e.parentPrenom || '', e.parentService || '', e.parentAgence || '', e.enfantNom, e.enfantPrenom, `${age(e.dateNaissance)} ans`, e.sexe === 'M' ? 'M' : 'F', e.statut, getListeLabel(e.liste), new Date(e.dateInscription).toLocaleDateString('fr-FR')];
+      const when = e.inscriptionAt ?? e.dateInscription;
+      return [
+        e.rang,
+        e.parentMatricule,
+        e.parentNom || '',
+        e.parentPrenom || '',
+        e.parentService || '',
+        e.parentAgence || '',
+        e.enfantNom,
+        e.enfantPrenom,
+        `${age(e.dateNaissance)} ans`,
+        e.sexe === 'M' ? 'M' : 'F',
+        e.statut,
+        getListeLabel(e.liste),
+        new Date(when).toLocaleDateString('fr-FR'),
+        new Date(when).toLocaleTimeString('fr-FR', { hour12: false }),
+      ];
     });
     return { headers, rows: dataRows };
   };
@@ -191,10 +209,14 @@ export default function ListeInscriptions() {
                 <TableHead className="font-semibold text-center">Liste</TableHead>
                 <TableHead className="font-semibold text-center">Statut</TableHead>
                 <TableHead className="font-semibold">Inscrit le</TableHead>
+                <TableHead className="font-semibold">Heure inscription</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((e) => (
+                  (() => {
+                    const when = e.inscriptionAt ?? e.dateInscription;
+                    return (
                   <TableRow key={e.id}>
                     <TableCell className="font-bold text-foreground text-center">{e.rang || '—'}</TableCell>
                     <TableCell className="font-mono tabular-nums text-sm">{e.parentMatricule}</TableCell>
@@ -212,8 +234,11 @@ export default function ListeInscriptions() {
                     <TableCell className="text-center">
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${getStatutBadge(e.statut)}`}>{e.statut}</span>
                     </TableCell>
-                    <TableCell className="tabular-nums text-sm text-muted-foreground">{new Date(e.dateInscription).toLocaleDateString('fr-FR')}</TableCell>
+                    <TableCell className="tabular-nums text-sm text-muted-foreground">{new Date(when).toLocaleDateString('fr-FR')}</TableCell>
+                    <TableCell className="tabular-nums text-sm text-muted-foreground">{new Date(when).toLocaleTimeString('fr-FR', { hour12: false })}</TableCell>
                   </TableRow>
+                    );
+                  })()
               ))}
             </TableBody>
           </Table>
