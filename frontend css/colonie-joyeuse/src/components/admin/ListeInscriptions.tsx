@@ -205,9 +205,9 @@ export default function ListeInscriptions() {
                 <TableHead className="font-semibold">Prénom Enfant</TableHead>
                 <TableHead className="font-semibold">Nom Enfant</TableHead>
                 <TableHead className="font-semibold">Âge</TableHead>
-                <TableHead className="font-semibold text-center">Sexe</TableHead>
-                <TableHead className="font-semibold text-center">Liste</TableHead>
-                <TableHead className="font-semibold text-center">Statut</TableHead>
+                <TableHead className="font-semibold">Sexe</TableHead>
+                <TableHead className="font-semibold">Liste</TableHead>
+                <TableHead className="font-semibold">Statut</TableHead>
                 <TableHead className="font-semibold">Inscrit le</TableHead>
                 <TableHead className="font-semibold">Heure inscription</TableHead>
               </TableRow>
@@ -227,11 +227,11 @@ export default function ListeInscriptions() {
                     <TableCell>{e.enfantPrenom}</TableCell>
                     <TableCell className="font-medium">{e.enfantNom}</TableCell>
                     <TableCell className="whitespace-nowrap">{age(e.dateNaissance)} ans</TableCell>
-                    <TableCell className="text-center">{e.sexe === 'M' ? 'M' : 'F'}</TableCell>
-                    <TableCell className="text-center">
+                    <TableCell>{e.sexe === 'M' ? 'M' : 'F'}</TableCell>
+                    <TableCell>
                       <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground whitespace-nowrap">{getListeLabel(e.liste)}</span>
                     </TableCell>
-                    <TableCell className="text-center">
+                    <TableCell>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${getStatutBadge(e.statut)}`}>{e.statut}</span>
                     </TableCell>
                     <TableCell className="tabular-nums text-sm text-muted-foreground">{new Date(when).toLocaleDateString('fr-FR')}</TableCell>
