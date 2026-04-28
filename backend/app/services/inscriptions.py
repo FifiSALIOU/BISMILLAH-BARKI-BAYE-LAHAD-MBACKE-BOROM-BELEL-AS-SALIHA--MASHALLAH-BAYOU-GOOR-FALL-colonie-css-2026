@@ -326,6 +326,7 @@ def create_inscription_for_parent_user(
         liste_id=target_liste.id,
         rang_dans_liste=rang,
         date_inscription=date.today(),
+        inscription_at=now_utc,
         statut=DemandeStatut.SOUMISE,
         non_validation_reason="",
         user_id=user.id,
@@ -380,6 +381,7 @@ def auto_sync_enfants_eligibles_du_parent(*, db: Session, user: User) -> None:
             liste_id=None,
             rang_dans_liste=None,
             date_inscription=date.today(),
+            inscription_at=now_utc,
             statut=DemandeStatut.SOUMISE,
             non_validation_reason="",
             user_id=user.id,
@@ -441,6 +443,7 @@ def set_titulaire(*, db: Session, user: User, enfant_id_titulaire: int) -> None:
         if dem is None:
             return
         dem.date_inscription = date.today()
+        dem.inscription_at = datetime.now(timezone.utc)
         liste_principale = db.query(Liste).filter(Liste.code == ListeCode.PRINCIPALE).first()
         if liste_principale is None:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Liste principale introuvable.")
@@ -537,6 +540,7 @@ def set_suppleant_n1(*, db: Session, user: User, enfant_id_suppleant: int) -> No
 
     old_liste_id = int(demande.liste_id) if demande.liste_id is not None else None
     demande.date_inscription = date.today()
+    demande.inscription_at = datetime.now(timezone.utc)
     demande.liste_id = int(liste_n1.id)
     demande.rang_dans_liste = _next_rang_for_liste(db, int(liste_n1.id))
     enfant.is_titulaire = False
@@ -633,6 +637,7 @@ def set_suppleant_n2(*, db: Session, user: User, enfant_id_suppleant: int) -> No
         )
 
     demande.date_inscription = date.today()
+    demande.inscription_at = datetime.now(timezone.utc)
     demande.liste_id = int(liste_n2.id)
     demande.rang_dans_liste = _next_rang_for_liste(db, int(liste_n2.id))
     enfant.is_titulaire = False
@@ -731,6 +736,7 @@ def reinscrire_desiste(*, db: Session, user: User, demande_id: int) -> DemandeIn
     demande.non_validation_reason = ""
     demande.reinscrit_apres_desistement = True
     demande.date_inscription = date.today()
+    demande.inscription_at = datetime.now(timezone.utc)
     demande.updated_at = datetime.now(timezone.utc)
     db.flush()
     resequence_rangs_pour_liste(db, int(demande.liste_id), demande_reinscrite_id=int(demande.id))

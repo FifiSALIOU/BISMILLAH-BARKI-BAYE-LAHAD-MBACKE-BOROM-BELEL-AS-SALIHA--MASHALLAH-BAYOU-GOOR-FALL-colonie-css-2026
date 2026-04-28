@@ -722,11 +722,12 @@ export default function ParentDashboard() {
                 <TableHead className="font-semibold">Sexe</TableHead>
                 <TableHead className="font-semibold">Statut</TableHead>
                 <TableHead className="font-semibold">Inscrit le</TableHead>
+                <TableHead className="font-semibold">Heure inscription</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.length === 0 ? (
-                <TableRow><TableCell colSpan={12} className="text-center py-8 text-muted-foreground">Aucune inscription</TableCell></TableRow>
+                <TableRow><TableCell colSpan={13} className="text-center py-8 text-muted-foreground">Aucune inscription</TableCell></TableRow>
               ) : (
                 filtered.map(e => {
                   const p = allParents.find(x => x.matricule === e.parentMatricule);
@@ -752,6 +753,7 @@ export default function ParentDashboard() {
                       <TableCell>{e.sexe === 'M' ? 'M' : 'F'}</TableCell>
                       <TableCell><span className={`text-xs font-medium px-2 py-0.5 rounded-md ${getStatutBadge(e.statut)}`}>{e.statut}</span></TableCell>
                       <TableCell className="tabular-nums text-sm text-muted-foreground">{new Date(e.dateInscription).toLocaleDateString('fr-FR')}</TableCell>
+                      <TableCell className="tabular-nums text-sm text-muted-foreground">{new Date(e.dateInscription).toLocaleTimeString('fr-FR', { hour12: false })}</TableCell>
                     </TableRow>
                   );
                 })

@@ -7,6 +7,8 @@ export type DemandeOutApi = {
   liste_code: string;
   rang_dans_liste: number | null;
   date_inscription: string;
+  inscription_at?: string | null;
+  created_at?: string | null;
   updated_at?: string | null;
   statut: string;
   non_validation_reason?: string | null;
@@ -31,6 +33,8 @@ export type TransparenceRowApi = {
   liste_code: string;
   rang_dans_liste: number;
   date_inscription: string;
+  inscription_at?: string | null;
+  created_at?: string | null;
   updated_at?: string | null;
   is_reinscrit: boolean;
   statut_demande: string;
@@ -112,13 +116,27 @@ function toDateIso(d: string | undefined): string {
   return d;
 }
 
+function resolveInscriptionDateTime(
+  dateInscription: string,
+  inscriptionAt?: string | null,
+): string {
+  if (typeof inscriptionAt === 'string' && inscriptionAt.includes('T')) return inscriptionAt;
+  if (dateInscription.includes('T')) {
+    const parsed = new Date(dateInscription);
+    const hasRealTime =
+      !Number.isNaN(parsed.getTime()) &&
+      !(parsed.getUTCHours() === 0 && parsed.getUTCMinutes() === 0 && parsed.getUTCSeconds() === 0);
+    if (hasRealTime) return dateInscription;
+  }
+  return `${dateInscription}T12:00:00.000Z`;
+}
+
 export function mapDemandeOutToEnfant(d: DemandeOutApi, parentMatricule: string): Enfant {
   const sexe = d.enfant_sexe === 'F' ? 'F' : 'M';
   const lienParente = LIEN_API_TO_FR[d.enfant_lien_parente] || 'Autre';
   const { validation, motifRefus } = validationFromStatut(d.statut, d.non_validation_reason);
   const { desistement, dateDesistement } = desistementFromDemande(d.statut, d.has_desistement_pending);
-  const when = d.date_inscription;
-  const dateInscription = when.includes('T') ? when : `${when}T12:00:00.000Z`;
+  const dateInscription = resolveInscriptionDateTime(d.date_inscription, d.inscription_at);
 
   let dateDes = dateDesistement;
   if (d.date_desistement) {
@@ -165,6 +183,8 @@ export function mapTransparenceRowToEnfant(row: TransparenceRowApi): Enfant {
     liste_code: row.liste_code,
     rang_dans_liste: row.rang_dans_liste,
     date_inscription: row.date_inscription,
+    inscription_at: row.inscription_at ?? null,
+    created_at: row.created_at ?? null,
     updated_at: row.updated_at ?? null,
     statut: row.statut_demande,
     non_validation_reason: null,

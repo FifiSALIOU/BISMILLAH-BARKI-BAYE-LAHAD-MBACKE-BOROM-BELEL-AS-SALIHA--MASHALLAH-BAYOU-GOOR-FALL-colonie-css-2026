@@ -47,6 +47,8 @@ class TransparenceInscriptionOut(BaseModel):
     liste_code: str
     rang_dans_liste: int
     date_inscription: datetime
+    inscription_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     is_reinscrit: bool = False
     statut_demande: str
@@ -71,6 +73,8 @@ class DemandeOut(BaseModel):
     liste_code: str
     rang_dans_liste: Optional[int] = None
     date_inscription: datetime
+    inscription_at: Optional[datetime] = None
+    created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     statut: str
     non_validation_reason: Optional[str] = None
