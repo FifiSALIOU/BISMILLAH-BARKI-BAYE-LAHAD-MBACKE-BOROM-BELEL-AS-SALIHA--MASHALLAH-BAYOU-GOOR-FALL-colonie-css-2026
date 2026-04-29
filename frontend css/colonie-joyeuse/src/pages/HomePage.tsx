@@ -220,7 +220,7 @@ export default function HomePage() {
         <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2">
             <img src={logo} alt="Logo CSS" className="h-6 w-6 rounded object-cover" />
-            <span>© 2026 Compagnie Sucriere Senegalaise</span>
+            <span>© 2026 Caisse de Securite Sociale</span>
           </div>
           <p>Colonie de Vacances - Tous droits reserves</p>
         </div>
