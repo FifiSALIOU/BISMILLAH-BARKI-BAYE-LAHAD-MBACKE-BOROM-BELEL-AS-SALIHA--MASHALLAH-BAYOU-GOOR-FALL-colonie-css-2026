@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { InscriptionProvider } from "@/contexts/InscriptionContext";
 import Index from "./pages/Index.tsx";
+import HomePage from "./pages/HomePage.tsx";
 
 import NotFound from "./pages/NotFound.tsx";
 
@@ -20,7 +21,7 @@ const App = () => (
           <Sonner />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Index />} />
+              <Route path="/" element={<HomePage />} />
               <Route path="/admin-login" element={<Index />} />
               {/* Parent routes */}
               <Route path="/dashboard" element={<Index page="dashboard" />} />
