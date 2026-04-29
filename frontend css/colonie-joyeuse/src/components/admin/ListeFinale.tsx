@@ -74,6 +74,7 @@ function areInscriptionsClosed(cfg: { dateFinInscriptions?: string | null }): bo
 }
 
 export default function ListeFinale() {
+  const validationDefinitiveButtonDisabled = true;
   const { token } = useAuth();
   const [enfantsRetenus, setEnfantsRetenus] = useState<Enfant[]>([]);
   const [enfantsDesistes, setEnfantsDesistes] = useState<Enfant[]>([]);
@@ -421,7 +422,7 @@ export default function ListeFinale() {
           <Button
             type="button"
             onClick={() => setConfirmValidationDefinitiveOpen(true)}
-            disabled={!inscriptionsCloturees || listeFinaleValideeDefinitive || validerDefinitifLoading}
+            disabled={validationDefinitiveButtonDisabled || !inscriptionsCloturees || listeFinaleValideeDefinitive || validerDefinitifLoading}
             className="gap-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white disabled:opacity-50 disabled:pointer-events-none"
           >
             <ShieldCheck className="w-4 h-4" />
