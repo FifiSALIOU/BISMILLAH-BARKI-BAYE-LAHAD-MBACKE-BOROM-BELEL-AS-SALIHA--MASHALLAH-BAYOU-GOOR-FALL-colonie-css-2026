@@ -107,8 +107,8 @@ export default function LoginPage() {
               transition={{ delay: 0.1, type: "spring", stiffness: 200 }}
             />
             <div>
-              <h1 className="text-2xl font-bold tracking-tight text-foreground">Colonie de Vacances 2026</h1>
-              <p className="text-muted-foreground mt-1 text-sm">Connectez-vous avec votre matricule ou e-mail</p>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">Bienvenue 👋</h1>
+              <p className="text-muted-foreground mt-1 text-sm">Connectez-vous pour inscrire vos enfants</p>
             </div>
           </div>
 
