@@ -286,7 +286,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="nos-engagements" className="bg-slate-50 py-16">
+      <section id="nos-engagements" className="relative overflow-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#eef2ff_100%)] py-20">
+        <div className="pointer-events-none absolute -left-16 top-16 h-48 w-48 rounded-full bg-[#ffecd1] blur-3xl" />
+        <div className="pointer-events-none absolute -right-16 bottom-8 h-48 w-48 rounded-full bg-[#dbe7ff] blur-3xl" />
         <div className="mx-auto max-w-7xl px-4">
           <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
             <div className="relative">
@@ -294,7 +296,7 @@ export default function HomePage() {
                 initial={{ opacity: 0, x: -20 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
-                className="group relative overflow-hidden rounded-3xl shadow-2xl"
+                className="group relative overflow-hidden rounded-3xl border border-white/70 shadow-[0_30px_50px_-30px_rgba(15,23,42,0.75)]"
               >
                 <img
                   src="/images/home/hero-1.jpeg"
@@ -310,7 +312,7 @@ export default function HomePage() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: 0.4 }}
-                className="absolute -bottom-6 -right-4 sm:right-6 max-w-[240px] rounded-2xl border border-gray-100 bg-white p-5 shadow-2xl"
+                className="absolute -bottom-6 -right-4 sm:right-6 max-w-[240px] rounded-2xl border border-gray-100 bg-white p-5 shadow-[0_24px_36px_-24px_rgba(2,6,23,0.9)]"
               >
                 <div className="mb-2 flex items-center gap-1 text-[#ff8600]">
                   {Array.from({ length: 5 }).map((_, index) => (
@@ -323,7 +325,7 @@ export default function HomePage() {
             </div>
 
             <div>
-              <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-700">
+              <span className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-wider text-slate-700">
                 Nos engagements
               </span>
               <h2 className="mt-3 text-3xl font-bold leading-tight text-[#070b4f] sm:text-5xl">
@@ -341,7 +343,7 @@ export default function HomePage() {
                     whileInView={{ opacity: 1, x: 0 }}
                     viewport={{ once: true }}
                     transition={{ delay: i * 0.1 }}
-                    className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:translate-x-1 hover:shadow-md"
+                    className="flex items-center gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-all duration-300 hover:translate-x-1 hover:shadow-[0_18px_28px_-22px_rgba(2,6,23,0.9)]"
                   >
                     <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#05085a]">
                       <value.icon className="h-6 w-6 text-white" />
