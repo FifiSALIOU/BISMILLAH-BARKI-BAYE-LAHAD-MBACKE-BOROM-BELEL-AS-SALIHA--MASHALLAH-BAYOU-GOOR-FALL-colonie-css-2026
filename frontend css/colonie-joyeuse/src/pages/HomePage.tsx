@@ -151,7 +151,7 @@ export default function HomePage() {
             </h1>
             <p className="mt-4 max-w-xl text-lg font-normal leading-relaxed text-slate-600">
               Un portail officiel, sécurisé et transparent pour gérer les inscriptions des enfants des employés.
-              Classement clair, suivi par email, démarche en moins de 5 minutes.
+              {/* Classement clair, suivi par email, démarche en moins de 5 minutes. */}
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
