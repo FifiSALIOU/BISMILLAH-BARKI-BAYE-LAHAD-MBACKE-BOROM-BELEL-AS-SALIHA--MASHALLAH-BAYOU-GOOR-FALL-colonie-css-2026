@@ -62,9 +62,35 @@ export default function ForcePasswordChange() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
-        <div className="bg-card rounded-xl shadow-elevated p-8 space-y-6">
+    <div className="grid min-h-screen w-full lg:grid-cols-2">
+      <div className="relative hidden min-h-[320px] overflow-hidden lg:block">
+        <img
+          src="/images/home/hero-1.jpeg"
+          alt="Colonie de vacances CSS"
+          className="absolute inset-0 h-full w-full object-cover"
+          width={1280}
+          height={896}
+        />
+        <div
+          className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(6,25,45,0.55)_0%,rgba(6,25,45,0.4)_40%,rgba(6,25,45,0.92)_100%)]"
+          aria-hidden
+        />
+        <div className="relative flex h-full min-h-screen flex-col justify-end p-10 xl:p-14">
+          <span className="mb-6 inline-flex w-fit items-center gap-2 rounded-md bg-[#F38A00] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white">
+            Sécurité renforcée
+          </span>
+          <h2 className="max-w-lg text-4xl font-extrabold leading-[1.1] tracking-tight text-white xl:text-5xl">
+            Sécurisez votre <span className="text-[#F38A00]">accès.</span>
+          </h2>
+          <p className="mt-4 max-w-md text-base leading-relaxed text-white/90">
+            Pour protéger les données de vos enfants, choisissez un mot de passe personnel, fort et confidentiel.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex min-h-screen items-center justify-center bg-white p-4 sm:p-8">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md">
+          <div className="bg-card rounded-xl shadow-elevated p-8 space-y-6">
           <div className="text-center space-y-3">
             <img src={logo} alt="Logo CSS" className="w-16 h-16 mx-auto object-contain" />
             <div>
@@ -81,7 +107,7 @@ export default function ForcePasswordChange() {
             </p>
           </div>
 
-          <div className="space-y-4">
+            <div className="space-y-4">
             <div className="space-y-2">
               <Label className="text-foreground font-medium">Nouveau mot de passe</Label>
               <div className="relative">
@@ -99,9 +125,10 @@ export default function ForcePasswordChange() {
             <Button onClick={handleSubmit} className="w-full h-12 rounded-lg bg-brand-navy text-primary-foreground hover:bg-brand-navy/90 font-semibold">
               Définir mon mot de passe
             </Button>
+            </div>
           </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </div>
 
       <Dialog open={errorOpen} onOpenChange={setErrorOpen}>
         <DialogContent className="sm:max-w-md rounded-xl">
