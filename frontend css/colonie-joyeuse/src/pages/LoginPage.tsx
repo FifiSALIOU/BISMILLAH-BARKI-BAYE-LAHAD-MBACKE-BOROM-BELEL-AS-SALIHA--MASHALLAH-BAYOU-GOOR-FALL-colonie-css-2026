@@ -84,18 +84,52 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-96 h-96 rounded-full bg-accent/10 blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 rounded-full bg-primary/5 blur-3xl" />
+    <div className="grid min-h-screen w-full lg:grid-cols-2">
+      {/* Panneau gauche : visuel uniquement (aucune logique métier) */}
+      <div className="relative hidden min-h-[320px] overflow-hidden lg:block">
+        <img
+          src="/images/home/hero-1.jpeg"
+          alt="Colonie de vacances CSS"
+          className="absolute inset-0 h-full w-full object-cover"
+          width={1280}
+          height={896}
+        />
+        <div
+          className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(6,25,45,0.55)_0%,rgba(6,25,45,0.4)_40%,rgba(6,25,45,0.92)_100%)]"
+          aria-hidden
+        />
+        <div className="relative flex h-full min-h-screen flex-col justify-end p-10 xl:p-14">
+          <span className="mb-6 inline-flex w-fit items-center gap-2 rounded-md bg-[#F38A00] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white">
+            Édition 2026
+          </span>
+          <h2 className="max-w-lg text-4xl font-extrabold leading-[1.1] tracking-tight text-white xl:text-5xl">
+            Offrez à vos enfants un été{" "}
+            <span className="text-[#F38A00]">inoubliable.</span>
+          </h2>
+          <p className="mt-4 max-w-md text-base leading-relaxed text-white/90">
+            La Colonie de Vacances propose un séjour encadré, sécurisé et riche en souvenirs pour les enfants de nos collaborateurs.
+          </p>
+          <ul className="mt-8 space-y-2 text-sm font-medium text-white/95">
+            <li className="flex items-center gap-2">
+              <span className="text-[#F38A00]">•</span>
+              Encadrement professionnel
+            </li>
+            <li className="flex items-center gap-2">
+              <span className="text-[#F38A00]">•</span>
+              Accès sécurisé au portail
+            </li>
+          </ul>
+        </div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-md relative z-10"
-      >
+      {/* Panneau droit : formulaire (comportement inchangé) */}
+      <div className="flex min-h-screen items-center justify-center bg-white p-4 sm:p-8">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4 }}
+          className="relative z-10 w-full max-w-md"
+        >
         <div className="bg-card rounded-xl shadow-elevated p-8 space-y-6">
           <div className="text-center space-y-3">
             <motion.img
@@ -167,24 +201,25 @@ export default function LoginPage() {
             
           </motion.div>
         </div>
-      </motion.div>
+        </motion.div>
 
-      <Dialog open={errorOpen} onOpenChange={setErrorOpen}>
-        <DialogContent className="sm:max-w-md rounded-xl">
-          <DialogHeader>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-destructive" />
+        <Dialog open={errorOpen} onOpenChange={setErrorOpen}>
+          <DialogContent className="sm:max-w-md rounded-xl">
+            <DialogHeader>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+                  <AlertTriangle className="w-5 h-5 text-destructive" />
+                </div>
+                <DialogTitle className="text-foreground">{errorTitle}</DialogTitle>
               </div>
-              <DialogTitle className="text-foreground">{errorTitle}</DialogTitle>
-            </div>
-            <DialogDescription className="text-muted-foreground pt-2">{errorMessage}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button onClick={() => setErrorOpen(false)} className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg">Compris</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              <DialogDescription className="text-muted-foreground pt-2">{errorMessage}</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button onClick={() => setErrorOpen(false)} className="bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg">Compris</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 }
