@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, LogIn, ShieldCheck, Users, Sparkles, Leaf, Flame, Compass, Music2, Star, Calendar, Phone, Mail, MapPin } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import logo from "@/assets/logo.png";
+import { useAuth } from "@/contexts/AuthContext";
 
 const heroImages = [
   "/images/home/hero-1.jpeg",
@@ -102,6 +103,7 @@ const programAxes = [
 
 export default function HomePage() {
   const [heroIndex, setHeroIndex] = useState(0);
+  const { logout } = useAuth();
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -123,6 +125,7 @@ export default function HomePage() {
           </div>
           <Link
             to="/admin-login"
+            onClick={logout}
             className="inline-flex items-center gap-2 rounded-xl bg-[#0A1F5C] px-4 py-2 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:bg-[#081848] hover:shadow-md"
           >
             <LogIn className="h-4 w-4" />
@@ -153,6 +156,7 @@ export default function HomePage() {
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
                 to="/admin-login"
+                onClick={logout}
                 className="inline-flex h-12 items-center gap-2 rounded-md bg-[#ff8000] px-6 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#e67900] hover:shadow-md"
               >
                 <LogIn className="h-4 w-4" />
@@ -393,7 +397,7 @@ export default function HomePage() {
               <li><a href="#programme" className="transition-colors hover:text-white">Étapes</a></li>
               <li><a href="#programme" className="transition-colors hover:text-white">Informations</a></li>
               */}
-              <li><Link to="/admin-login" className="transition-colors hover:text-white">Connexion</Link></li>
+              <li><Link to="/admin-login" onClick={logout} className="transition-colors hover:text-white">Connexion</Link></li>
             </ul>
           </div>
         </div>
