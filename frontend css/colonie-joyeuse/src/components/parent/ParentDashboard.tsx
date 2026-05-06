@@ -1135,19 +1135,6 @@ export default function ParentDashboard() {
           ))}
         </div>
         )}
-        {afficherInscriptionNonBio && enfantsMesEligibles.length > 0 && (
-          <div className="max-w-4xl">
-            <Button
-              onClick={() => { setInscrireNonBioMode(true); setInscrireOpen(true); }}
-              disabled={desactiverInscriptionNonBio}
-              variant="outline"
-              className="rounded-lg h-10 px-4 gap-2 text-sm"
-            >
-              <UserPlus className="w-4 h-4" />
-              Ajouter un enfant (lien "Autre")
-            </Button>
-          </div>
-        )}
       </div>
 
       {/* Tabs : affichés seulement après chargement demandes + transparence (évite flash titre / encart). */}
