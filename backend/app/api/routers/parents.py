@@ -19,6 +19,7 @@ from app.schemas.inscriptions import (
     DesistementRequestIn,
     EnfantCorrectionIn,
     InscriptionCreateIn,
+    RemplacementIn,
     TitulaireUpdateIn,
     TransparenceInscriptionOut,
 )
@@ -31,6 +32,7 @@ from app.services.inscriptions import (
     create_inscription_for_parent_user,
     ensure_listes_exist,
     parent_corriger_demande_sans_changer_rang,
+    remplacer_enfant_par_non_inscrit,
     reinscrire_desiste,
     request_desistement,
     set_suppleant_n1,
@@ -614,6 +616,22 @@ def definir_suppleant_n2(
     user: User = Depends(require_roles(UserRole.PARENT)),
 ):
     set_suppleant_n2(db=db, user=user, enfant_id_suppleant=payload.enfant_id_titulaire)
+    db.commit()
+    return {"ok": True}
+
+
+@router.post("/remplacer-enfant")
+def remplacer_enfant(
+    payload: RemplacementIn,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.PARENT)),
+):
+    remplacer_enfant_par_non_inscrit(
+        db=db,
+        user=user,
+        demande_a_remplacer_id=payload.demande_a_remplacer_id,
+        demande_remplacante_id=payload.demande_remplacante_id,
+    )
     db.commit()
     return {"ok": True}
 

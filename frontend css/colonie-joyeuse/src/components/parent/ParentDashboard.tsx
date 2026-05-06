@@ -20,7 +20,7 @@ import {
   idDemandePourRang,
   rangAfficheParDemandeIdPourEnfants,
 } from '@/lib/ordreArriveeListe';
-import { Users, UserCheck, Clock, Star, Award, AlertTriangle, Lock, UserPlus, ArrowUpDown, HandMetal, XCircle, RotateCcw, Hash, Search, User, FilePenLine, Phone } from 'lucide-react';
+import { Users, UserCheck, Clock, Star, Award, AlertTriangle, Lock, UserPlus, ArrowUpDown, HandMetal, XCircle, RotateCcw, Hash, Search, User, FilePenLine, Phone, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -152,6 +152,10 @@ export default function ParentDashboard() {
   const [editDateNaissance, setEditDateNaissance] = useState('');
   const [editSexe, setEditSexe] = useState<'M' | 'F'>('M');
   const [editLienParente, setEditLienParente] = useState<LienParenteApi>('PERE');
+  const [remplacerOpen, setRemplacerOpen] = useState(false);
+  const [demandeARemplacerId, setDemandeARemplacerId] = useState('');
+  const [enfantARemplacerNom, setEnfantARemplacerNom] = useState('');
+  const [demandeRemplacanteId, setDemandeRemplacanteId] = useState('');
 
   // Tabs
   const [activeTab, setActiveTab] = useState('principale');
@@ -348,6 +352,13 @@ export default function ParentDashboard() {
       e.liste === 'attente_n2' &&
       e.lienParente !== 'Autre' &&
       e.statut !== 'Titulaire');
+  const enfantsRemplacantsDisponibles = enfantsMesEligibles.filter((e) => {
+    if (!isNonInscrit(e)) return false;
+    if (e.lienParente === 'Autre') return false;
+    const did = typeof e.demandeId === 'number' && Number.isFinite(e.demandeId) ? e.demandeId : Number(e.id);
+    if (!Number.isFinite(did)) return false;
+    return String(did) !== demandeARemplacerId;
+  });
 
   const capListesTitulaireN1Atteint =
     MAX != null && (placesListesParentSaison >= MAX || placesListesParentSaisonHistorique >= MAX || limiteMaxDejaAtteinte);
@@ -544,6 +555,46 @@ export default function ParentDashboard() {
     setEditSexe(enfant.sexe === 'F' ? 'F' : 'M');
     setEditLienParente(lienApi);
     setEditOpen(true);
+  };
+
+  const handleRemplacer = (enfant: Enfant) => {
+    const demandeId = getDemandeIdForAction(enfant);
+    if (!demandeId) return;
+    setDemandeARemplacerId(String(demandeId));
+    setEnfantARemplacerNom(`${enfant.prenom} ${enfant.nom}`);
+    setDemandeRemplacanteId('');
+    setRemplacerOpen(true);
+  };
+
+  const confirmRemplacement = async () => {
+    if (!token || !demandeARemplacerId || !demandeRemplacanteId) return;
+    try {
+      await apiRequest('/parent/remplacer-enfant', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          demande_a_remplacer_id: Number(demandeARemplacerId),
+          demande_remplacante_id: Number(demandeRemplacanteId),
+        }),
+      });
+      await loadAll();
+      toast({
+        title: (
+          <span className="inline-flex items-center gap-1.5 text-emerald-600">
+            <Check className="h-4 w-4 shrink-0" aria-hidden />
+            Remplacement effectué
+          </span>
+        ),
+      });
+      setRemplacerOpen(false);
+      setDemandeARemplacerId('');
+      setEnfantARemplacerNom('');
+      setDemandeRemplacanteId('');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Remplacement impossible';
+      toast({ title: 'Remplacement impossible', description: msg, variant: 'destructive' });
+      console.error(err);
+    }
   };
 
   const confirmEditDemande = async () => {
@@ -1046,6 +1097,20 @@ export default function ParentDashboard() {
                         <HandMetal className="w-3 h-3" />Désistement
                       </Button>
                     )}
+                    {!inscriptionsCloturees &&
+                      !listeFinaleDefinitiveApi &&
+                      !enfant.desistement &&
+                      !enfant.rejetDefinitif &&
+                      (enfant.statut === 'Titulaire' || enfant.statut === 'Suppléant N1') && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemplacer(enfant)}
+                        className="rounded-lg gap-1 text-xs"
+                      >
+                        Remplacer
+                      </Button>
+                    )}
                     {enfant.desistement === 'demandé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <Button variant="outline" size="sm" onClick={() => handleAnnulerDesistement(enfant.id)} className="rounded-lg gap-1 text-xs text-amber-700 border-amber-300 hover:bg-amber-50">
                         <XCircle className="w-3 h-3" />Annuler désistement
@@ -1312,6 +1377,50 @@ export default function ParentDashboard() {
               </Button>
             )}
             <Button onClick={confirmDesistement} className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 whitespace-nowrap">Confirmer le désistement</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={remplacerOpen} onOpenChange={setRemplacerOpen}>
+        <DialogContent className="sm:max-w-md rounded-xl">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Remplacer l'enfant inscrit</DialogTitle>
+            <DialogDescription className="pt-2">
+              Sélectionnez un enfant non inscrit pour remplacer <strong>{enfantARemplacerNom}</strong>.
+              {/* Le rang, la date et l&apos;heure d&apos;inscription seront conservés à l&apos;identique. */}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-foreground">Enfant remplaçant (non inscrit)</label>
+            <select
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+              value={demandeRemplacanteId}
+              onChange={(e) => setDemandeRemplacanteId(e.target.value)}
+            >
+              <option value="">Choisir un enfant</option>
+              {enfantsRemplacantsDisponibles.map((e) => {
+                const did = getDemandeIdForAction(e);
+                if (!did) return null;
+                return (
+                  <option key={e.id} value={String(did)}>
+                    {e.prenom} {e.nom}
+                  </option>
+                );
+              })}
+            </select>
+            {enfantsRemplacantsDisponibles.length === 0 && (
+              <p className="text-xs text-muted-foreground">Aucun enfant non inscrit disponible pour ce remplacement.</p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRemplacerOpen(false)} className="rounded-lg">Annuler</Button>
+            <Button
+              onClick={() => { void confirmRemplacement(); }}
+              className="rounded-lg bg-accent text-white hover:bg-accent/90"
+              disabled={!demandeRemplacanteId}
+            >
+              Confirmer le remplacement
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

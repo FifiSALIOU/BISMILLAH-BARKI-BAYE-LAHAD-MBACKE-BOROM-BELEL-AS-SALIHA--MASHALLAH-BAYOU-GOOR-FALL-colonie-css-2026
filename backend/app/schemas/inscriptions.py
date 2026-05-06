@@ -112,6 +112,11 @@ class TitulaireUpdateIn(BaseModel):
     enfant_id_titulaire: int
 
 
+class RemplacementIn(BaseModel):
+    demande_a_remplacer_id: int
+    demande_remplacante_id: int
+
+
 class DesistementRequestIn(BaseModel):
     reason: Optional[str] = Field(default=None, max_length=2000)
 

@@ -643,6 +643,108 @@ def set_suppleant_n2(*, db: Session, user: User, enfant_id_suppleant: int) -> No
     enfant.is_titulaire = False
 
 
+def remplacer_enfant_par_non_inscrit(
+    *,
+    db: Session,
+    user: User,
+    demande_a_remplacer_id: int,
+    demande_remplacante_id: int,
+) -> None:
+    """Remplace un enfant déjà inscrit (P ou N1) par un enfant non inscrit, sans changer rang/date/heure."""
+    raise_if_liste_finale_definitive()
+    parent = db.query(Parent).filter(Parent.user_id == user.id).first()
+    if not parent:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent introuvable.")
+
+    demande_a_remplacer = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(DemandeInscription.id == demande_a_remplacer_id, Enfant.parent_id == parent.id)
+        .first()
+    )
+    if not demande_a_remplacer:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande à remplacer introuvable.")
+
+    demande_remplacante = (
+        db.query(DemandeInscription)
+        .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+        .filter(DemandeInscription.id == demande_remplacante_id, Enfant.parent_id == parent.id)
+        .first()
+    )
+    if not demande_remplacante:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Demande remplaçante introuvable.")
+
+    if int(demande_a_remplacer.id) == int(demande_remplacante.id):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Remplacement invalide.")
+
+    _require_not_rejet_definitif(demande_a_remplacer)
+    _require_not_rejet_definitif(demande_remplacante)
+
+    if demande_a_remplacer.statut not in (DemandeStatut.SOUMISE, DemandeStatut.RETENUE):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Seules les demandes inscrites actives peuvent être remplacées.",
+        )
+    if demande_a_remplacer.liste_id is None or demande_a_remplacer.rang_dans_liste is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="La demande à remplacer n'est pas inscrite.")
+
+    liste_code = demande_a_remplacer.liste.code if demande_a_remplacer.liste is not None else None
+    if liste_code not in (ListeCode.PRINCIPALE, ListeCode.ATTENTE_N1):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Remplacement autorisé uniquement pour le titulaire et le suppléant N°1.",
+        )
+
+    if demande_remplacante.statut != DemandeStatut.SOUMISE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="L'enfant remplaçant doit être non inscrit.",
+        )
+    if demande_remplacante.liste_id is not None or demande_remplacante.rang_dans_liste is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="L'enfant remplaçant doit être non inscrit.",
+        )
+    if demande_remplacante.enfant.lien_parente == LienParente.AUTRE:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="L'enfant remplaçant doit être éligible en lien biologique.",
+        )
+    if not _date_naissance_dans_plage(demande_remplacante.enfant.date_naissance):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="L'enfant remplaçant n'est pas éligible sur la période d'âge.",
+        )
+    if demande_remplacante.desistement is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="L'enfant remplaçant ne doit pas avoir de désistement en cours.",
+        )
+
+    now_utc = datetime.now(timezone.utc)
+    old_is_titulaire = bool(demande_a_remplacer.enfant.is_titulaire)
+
+    # Conserve strictement slot/rang/date/heure/statut de la demande remplacée.
+    demande_remplacante.liste_id = int(demande_a_remplacer.liste_id)
+    demande_remplacante.rang_dans_liste = int(demande_a_remplacer.rang_dans_liste)
+    demande_remplacante.date_inscription = demande_a_remplacer.date_inscription
+    demande_remplacante.inscription_at = demande_a_remplacer.inscription_at
+    demande_remplacante.statut = demande_a_remplacer.statut
+    demande_remplacante.non_validation_reason = demande_a_remplacer.non_validation_reason
+    demande_remplacante.reinscrit_apres_desistement = bool(demande_a_remplacer.reinscrit_apres_desistement)
+    demande_remplacante.updated_at = now_utc
+    demande_remplacante.enfant.is_titulaire = old_is_titulaire
+
+    # L'enfant remplacé redevient non inscrit.
+    demande_a_remplacer.liste_id = None
+    demande_a_remplacer.rang_dans_liste = None
+    demande_a_remplacer.statut = DemandeStatut.SOUMISE
+    demande_a_remplacer.non_validation_reason = ""
+    demande_a_remplacer.reinscrit_apres_desistement = False
+    demande_a_remplacer.updated_at = now_utc
+    demande_a_remplacer.enfant.is_titulaire = False
+
+
 def request_desistement(*, db: Session, user: User, demande_id: int, reason: str | None) -> None:
     raise_if_liste_finale_definitive()
     # Ancien flux (conservé en mémoire lecture seule) : création d’une ligne `Desistement` en attente,
