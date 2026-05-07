@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInscription } from '@/contexts/InscriptionContext';
 import { apiRequest } from '@/lib/api';
@@ -98,6 +99,14 @@ export default function LoginPage() {
           className="absolute inset-0 bg-[linear-gradient(to_bottom,rgba(6,25,45,0.55)_0%,rgba(6,25,45,0.4)_40%,rgba(6,25,45,0.92)_100%)]"
           aria-hidden
         />
+        <div className="absolute left-6 top-6 z-10">
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/40 bg-white/10 px-4 py-2 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
+          >
+            Retour à l’accueil
+          </Link>
+        </div>
         <div className="relative flex h-full min-h-screen flex-col justify-end p-10 xl:p-14">
           <span className="mb-6 inline-flex w-fit items-center gap-2 rounded-md bg-[#F38A00] px-3 py-1.5 text-xs font-semibold uppercase tracking-wide text-white">
             Édition 2026
