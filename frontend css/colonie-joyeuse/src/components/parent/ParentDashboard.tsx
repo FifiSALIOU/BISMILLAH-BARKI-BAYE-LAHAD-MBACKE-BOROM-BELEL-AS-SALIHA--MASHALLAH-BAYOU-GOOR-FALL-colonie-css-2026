@@ -20,7 +20,7 @@ import {
   idDemandePourRang,
   rangAfficheParDemandeIdPourEnfants,
 } from '@/lib/ordreArriveeListe';
-import { Users, UserCheck, Clock, Star, Award, AlertTriangle, Lock, UserPlus, ArrowUpDown, HandMetal, XCircle, RotateCcw, Hash, Search, User, FilePenLine, Phone, Check } from 'lucide-react';
+import { Users, UserCheck, Clock, Star, Award, AlertTriangle, Lock, UserPlus, ArrowUpDown, ArrowUp, ArrowDown, HandMetal, XCircle, RotateCcw, Hash, Search, User, FilePenLine, Phone, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
@@ -30,6 +30,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import InscrireEnfant from '@/components/parent/InscrireEnfant';
 import ListeFinaleParent from '@/components/parent/ListeFinaleParent';
+import { getTitulaireSwapBadgeKind, markTitulaireSwapBadges } from '@/lib/titulaireSwapBadges';
 
 type LienParenteApi = 'PERE' | 'MERE' | 'TUTEUR_LEGAL' | 'AUTRE';
 
@@ -381,6 +382,13 @@ export default function ParentDashboard() {
   const confirmChange = async () => {
     const e = enfants.find((x) => x.id === selectedId);
     const demandeId = getDemandeIdForAction(e);
+    const ancienTitulaire = enfants.find((x) => x.statut === 'Titulaire' && x.liste === 'principale' && !x.desistement);
+    const ancienTitulaireDemandeId = getDemandeIdForAction(ancienTitulaire);
+    const isSwapTitulaireN1 =
+      !!e &&
+      e.liste === 'attente_n1' &&
+      !!ancienTitulaireDemandeId &&
+      ancienTitulaireDemandeId !== demandeId;
     /** L’API `/parent/titulaire` attend en priorité l’id de la demande (`DemandeOut.id`). */
     if (!demandeId || !token) {
       setConfirmOpen(false);
@@ -392,6 +400,13 @@ export default function ParentDashboard() {
         token,
         body: JSON.stringify({ enfant_id_titulaire: demandeId }),
       });
+      if (isSwapTitulaireN1 && ancienTitulaireDemandeId && parent?.matricule) {
+        markTitulaireSwapBadges({
+          parentMatricule: parent.matricule,
+          promotedDemandeId: demandeId,
+          exTitulaireDemandeId: ancienTitulaireDemandeId,
+        });
+      }
       await loadAll();
       addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Changement titulaire', details: `A défini ${selectedName} comme titulaire`, cible: selectedName });
     } catch (err) {
@@ -408,6 +423,8 @@ export default function ParentDashboard() {
 
   const handleSwapAndDesist = async () => {
     const demandeId = getDemandeIdForAction(enfantN1);
+    const ancienTitulaire = enfants.find((x) => x.statut === 'Titulaire' && x.liste === 'principale' && !x.desistement);
+    const ancienTitulaireDemandeId = getDemandeIdForAction(ancienTitulaire);
     if (!demandeId || !token) return;
     try {
       await apiRequest('/parent/titulaire', {
@@ -415,6 +432,13 @@ export default function ParentDashboard() {
         token,
         body: JSON.stringify({ enfant_id_titulaire: demandeId }),
       });
+      if (ancienTitulaireDemandeId && parent?.matricule && ancienTitulaireDemandeId !== demandeId) {
+        markTitulaireSwapBadges({
+          parentMatricule: parent.matricule,
+          promotedDemandeId: demandeId,
+          exTitulaireDemandeId: ancienTitulaireDemandeId,
+        });
+      }
       await loadAll();
       addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Changement titulaire', details: `A défini ${enfantN1.prenom} ${enfantN1.nom} comme titulaire avant désistement`, cible: `${enfantN1.prenom} ${enfantN1.nom}` });
     } catch (err) {
@@ -784,6 +808,13 @@ export default function ParentDashboard() {
                   const p = allParents.find(x => x.matricule === e.parentMatricule);
                   const isHighlighted = highlightedEnfantId === e.id;
                   const did = idDemandePourRang(e);
+                  const swapBadgeKind =
+                    (liste === 'principale' || liste === 'attente_n1') && did >= 0
+                      ? getTitulaireSwapBadgeKind({
+                          parentMatricule: e.parentMatricule,
+                          demandeId: did,
+                        })
+                      : null;
                   const rangAff =
                     typeof e.rangListe === 'number' && e.rangListe > 0
                       ? e.rangListe
@@ -802,7 +833,23 @@ export default function ParentDashboard() {
                       <TableCell className="font-medium">{e.nom}</TableCell>
                       <TableCell>{calculateAge(e.dateNaissance)} ans</TableCell>
                       <TableCell>{e.sexe === 'M' ? 'M' : 'F'}</TableCell>
-                      <TableCell><span className={`text-xs font-medium px-2 py-0.5 rounded-md ${getStatutBadge(e.statut)}`}>{e.statut}</span></TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${getStatutBadge(e.statut)}`}>{e.statut}</span>
+                          {swapBadgeKind === 'promoted' && (
+                            <span className="inline-flex w-fit items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              <ArrowUp className="h-3 w-3" />
+                              Promu
+                            </span>
+                          )}
+                          {swapBadgeKind === 'ex_titulaire' && (
+                            <span className="inline-flex w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                              <ArrowDown className="h-3 w-3" />
+                              Ex-titulaire
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
                       <TableCell className="tabular-nums text-sm text-muted-foreground">{new Date(e.dateInscription).toLocaleDateString('fr-FR')}</TableCell>
                       <TableCell className="tabular-nums text-sm text-muted-foreground">{new Date(e.dateInscription).toLocaleTimeString('fr-FR', { hour12: false })}</TableCell>
                     </TableRow>

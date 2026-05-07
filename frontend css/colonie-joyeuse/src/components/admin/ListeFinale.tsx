@@ -421,7 +421,7 @@ export default function ListeFinale() {
           <Button
             type="button"
             onClick={() => setConfirmValidationDefinitiveOpen(true)}
-            disabled={!inscriptionsCloturees || listeFinaleValideeDefinitive || validerDefinitifLoading}
+            disabled={true}
             className="gap-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white disabled:opacity-50 disabled:pointer-events-none"
           >
             <ShieldCheck className="w-4 h-4" />

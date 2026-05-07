@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
 import { useInscription } from '@/contexts/InscriptionContext';
-import { calculateAge } from '@/data/mockData';
+import { calculateAge, type Enfant } from '@/data/mockData';
 import { Star, ArrowUpDown, User, HandMetal, AlertTriangle, CheckCircle2, Award, XCircle, RotateCcw, Hash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { markTitulaireSwapBadges } from '@/lib/titulaireSwapBadges';
 
 export default function MesEnfants() {
   const { parent } = useAuth();
@@ -31,10 +32,32 @@ export default function MesEnfants() {
 
   // Find the N1 child for the titulaire swap suggestion
   const enfantN1 = enfants.find(e => e.statut === 'Suppléant N1' && !e.desistement);
+  const getDemandeIdForAction = (e: Enfant | undefined): number | null => {
+    if (!e) return null;
+    if (typeof e.demandeId === 'number' && Number.isFinite(e.demandeId)) return e.demandeId;
+    const fallback = Number(e.id);
+    return Number.isFinite(fallback) ? fallback : null;
+  };
 
   const handleSetTitulaire = (id: string, name: string) => { setSelectedId(id); setSelectedName(name); setConfirmOpen(true); };
   const confirmChange = () => {
+    const target = enfants.find((x) => x.id === selectedId);
+    const targetDemandeId = getDemandeIdForAction(target);
+    const ancienTitulaire = enfants.find((x) => x.statut === 'Titulaire' && x.liste === 'principale' && !x.desistement);
+    const ancienTitulaireDemandeId = getDemandeIdForAction(ancienTitulaire);
     setTitulaire(parent.matricule, selectedId);
+    if (
+      target?.liste === 'attente_n1' &&
+      targetDemandeId &&
+      ancienTitulaireDemandeId &&
+      targetDemandeId !== ancienTitulaireDemandeId
+    ) {
+      markTitulaireSwapBadges({
+        parentMatricule: parent.matricule,
+        promotedDemandeId: targetDemandeId,
+        exTitulaireDemandeId: ancienTitulaireDemandeId,
+      });
+    }
     addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Changement titulaire', details: `A défini ${selectedName} comme titulaire`, cible: selectedName });
     setConfirmOpen(false);
   };
@@ -47,8 +70,18 @@ export default function MesEnfants() {
 
   const handleSwapAndDesist = () => {
     if (!enfantN1) return;
+    const enfantN1DemandeId = getDemandeIdForAction(enfantN1);
+    const ancienTitulaire = enfants.find((x) => x.statut === 'Titulaire' && x.liste === 'principale' && !x.desistement);
+    const ancienTitulaireDemandeId = getDemandeIdForAction(ancienTitulaire);
     // First swap: make N1 child the titulaire
     setTitulaire(parent.matricule, enfantN1.id);
+    if (enfantN1DemandeId && ancienTitulaireDemandeId && enfantN1DemandeId !== ancienTitulaireDemandeId) {
+      markTitulaireSwapBadges({
+        parentMatricule: parent.matricule,
+        promotedDemandeId: enfantN1DemandeId,
+        exTitulaireDemandeId: ancienTitulaireDemandeId,
+      });
+    }
     addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Changement titulaire', details: `A défini ${enfantN1.prenom} ${enfantN1.nom} comme titulaire avant désistement`, cible: `${enfantN1.prenom} ${enfantN1.nom}` });
     // Don't close dialog - let parent click "Confirmer le désistement" next
     // The desistementId still points to the original child (now Suppléant N1)

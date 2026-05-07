@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { useInscription } from '@/contexts/InscriptionContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileDown, Eye, Search, Filter, CheckCircle2, HandMetal, ThumbsDown, X } from 'lucide-react';
+import { FileDown, Eye, Search, Filter, CheckCircle2, HandMetal, ThumbsDown, X, ArrowUp, ArrowDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
 import { listeApiToUi, listeUiToApi, statutLabelFromListeUi, type ListeUi } from '@/lib/listeCodes';
+import { getTitulaireSwapBadgeKind } from '@/lib/titulaireSwapBadges';
 
 type Enfant = {
   id: string;
@@ -477,6 +478,13 @@ export default function GestionListe({ type }: Props) {
                 enfantsOrdreArrivee.map((e) => {
                   const p = { nom: e.parentNom, prenom: e.parentPrenom, service: e.parentService, email: e.parentEmail, telephone: e.parentTelephone };
                   const validation = e.validation || 'en_attente';
+                  const swapBadgeKind =
+                    (type === 'principale' || type === 'attente_n1')
+                      ? getTitulaireSwapBadgeKind({
+                          parentMatricule: e.parentMatricule,
+                          demandeId: e.demandeId,
+                        })
+                      : null;
                   return (
                     <TableRow
                       key={e.id}
@@ -503,6 +511,18 @@ export default function GestionListe({ type }: Props) {
                       <TableCell>
                         <div className="flex flex-col gap-1">
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-md ${getStatutBadge(e.statut)}`}>{e.statut}</span>
+                          {swapBadgeKind === 'promoted' && (
+                            <span className="inline-flex w-fit items-center gap-1 rounded-md bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              <ArrowUp className="h-3 w-3" />
+                              Promu
+                            </span>
+                          )}
+                          {swapBadgeKind === 'ex_titulaire' && (
+                            <span className="inline-flex w-fit items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                              <ArrowDown className="h-3 w-3" />
+                              Ex-titulaire
+                            </span>
+                          )}
                           {e.desistement === 'demandé' && <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-amber-50 text-amber-700">⏳ Désistement</span>}
                           {e.desistement === 'validé' && <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-destructive/10 text-destructive">Désisté</span>}
                         </div>
