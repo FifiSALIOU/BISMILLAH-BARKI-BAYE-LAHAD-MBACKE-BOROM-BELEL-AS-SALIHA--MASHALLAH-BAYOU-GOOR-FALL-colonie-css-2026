@@ -111,6 +111,36 @@ def body_titulaire(
     )
 
 
+def subject_remplacement_admin_notify(parent_matricule: str, enfant_remplacant_nom: str) -> str:
+    return f"Colonie 2026 — Remplacement (notification) — {parent_matricule} — {enfant_remplacant_nom}"
+
+
+def body_remplacement_admin_notify(
+    *,
+    parent_matricule: str,
+    parent_prenom: str,
+    parent_nom: str,
+    enfant_remplace: str,
+    enfant_remplacant: str,
+    liste: str,
+    rang: int | None,
+    when: datetime,
+):
+    parent_label = f"{parent_prenom} {parent_nom}".strip() or parent_matricule
+    return (
+        "Bonjour,\n\n"
+        f"{parent_label} a effectué un remplacement d’enfant inscrit sur la plateforme Colonie 2026.\n\n"
+        f"- Matricule parent: {parent_matricule}\n"
+        f"- Parent: {parent_prenom} {parent_nom}\n"
+        f"- Enfant remplacé: {enfant_remplace}\n"
+        f"- Nouvel enfant inscrit: {enfant_remplacant}\n"
+        f"- Liste: {liste}\n"
+        f"- Rang conservé: {rang if rang is not None else '—'}\n"
+        f"- Date: {_dt(when)}\n\n"
+        "Cordialement.\n"
+    )
+
+
 def subject_selection(parent_matricule: str, enfant_nom: str) -> str:
     return f"Colonie 2026 — Contrôle d’une demande ({parent_matricule}) — {enfant_nom}"
 

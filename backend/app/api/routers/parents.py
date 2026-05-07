@@ -52,10 +52,12 @@ from app.services.runtime_settings_store import get_max_enfants_par_parent
 from app.services.email_templates import (
     body_desistement_validated_admin,
     body_inscription_admin_notify,
+    body_remplacement_admin_notify,
     body_reinscription_admin_notify,
     body_titulaire,
     subject_desistement_valide_admin,
     subject_inscription_admin_notify,
+    subject_remplacement_admin_notify,
     subject_reinscription_admin_notify,
     subject_titulaire,
     # Anciennement pour un désistement « en attente » : subject_desistement_admin, body_desistement_requested_admin.
@@ -623,9 +625,46 @@ def definir_suppleant_n2(
 @router.post("/remplacer-enfant")
 def remplacer_enfant(
     payload: RemplacementIn,
+    background: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.PARENT)),
 ):
+    def _label_liste_remplacement(code: str | None) -> str:
+        mapping = {
+            "PRINCIPALE": "Liste principale",
+            "ATTENTE_N1": "Liste d'attente N°1",
+            "ATTENTE_N2": "Liste d'attente N°2",
+        }
+        return mapping.get((code or "").strip().upper(), (code or "").strip())
+
+    parent = db.query(Parent).filter(Parent.user_id == user.id).first()
+    demande_a_remplacer = None
+    demande_remplacante = None
+    enfant_remplace = ""
+    enfant_remplacant = ""
+    liste_label = "—"
+    rang_conserve: int | None = None
+    if parent is not None:
+        demande_a_remplacer = (
+            db.query(DemandeInscription)
+            .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+            .filter(DemandeInscription.id == payload.demande_a_remplacer_id, Enfant.parent_id == parent.id)
+            .first()
+        )
+        demande_remplacante = (
+            db.query(DemandeInscription)
+            .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+            .filter(DemandeInscription.id == payload.demande_remplacante_id, Enfant.parent_id == parent.id)
+            .first()
+        )
+        if demande_a_remplacer is not None:
+            enfant_remplace = f"{demande_a_remplacer.enfant.prenom} {demande_a_remplacer.enfant.nom}"
+            rang_conserve = demande_a_remplacer.rang_dans_liste
+            liste_code = demande_a_remplacer.liste.code.value if demande_a_remplacer.liste and demande_a_remplacer.liste.code else None
+            liste_label = _label_liste_remplacement(liste_code) if liste_code else "—"
+        if demande_remplacante is not None:
+            enfant_remplacant = f"{demande_remplacante.enfant.prenom} {demande_remplacante.enfant.nom}"
+
     remplacer_enfant_par_non_inscrit(
         db=db,
         user=user,
@@ -633,6 +672,28 @@ def remplacer_enfant(
         demande_remplacante_id=payload.demande_remplacante_id,
     )
     db.commit()
+
+    if parent is not None and demande_a_remplacer is not None and demande_remplacante is not None:
+        admin_emails = collect_admin_emails(db)
+        to_admins = uniq_emails(admin_emails)
+        if to_admins:
+            when = datetime.now(timezone.utc)
+            background.add_task(
+                send_email,
+                to=to_admins,
+                subject=subject_remplacement_admin_notify(parent.matricule, enfant_remplacant),
+                body=body_remplacement_admin_notify(
+                    parent_matricule=parent.matricule,
+                    parent_prenom=parent.prenom,
+                    parent_nom=parent.nom,
+                    enfant_remplace=enfant_remplace,
+                    enfant_remplacant=enfant_remplacant,
+                    liste=liste_label,
+                    rang=rang_conserve,
+                    when=when,
+                ),
+            )
+
     return {"ok": True}
 
 
