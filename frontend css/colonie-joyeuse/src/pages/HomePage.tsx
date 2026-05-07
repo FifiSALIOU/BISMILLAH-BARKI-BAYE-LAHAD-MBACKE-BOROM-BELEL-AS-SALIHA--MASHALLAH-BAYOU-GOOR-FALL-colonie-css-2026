@@ -7,18 +7,14 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const heroImages = [
   "/images/home/hero-1.jpeg",
-  "/images/home/hero-2.jpeg",
   "/images/home/hero-3.jpeg",
-  "/images/home/hero-4.jpeg",
   "/images/home/hero-5.jpeg",
 ];
 
 const heroCaptions = [
-  "Photo officielle - Colonie CSS",
-  "Photo officielle - Colonie CSS",
+  "Toute la colonie réunie — Édition CSS",
   "Grande ronde dans le parc",
-  "Echauffement avant les activites sportives",
-  "Joie et eclats d'eau a la piscine",
+  "Aventures nautiques encadrées",
 ];
 
 const engagementValues = [
@@ -134,72 +130,63 @@ export default function HomePage() {
         </div>
       </header>
 
-      <section className="mx-auto w-full max-w-7xl px-4 py-8 sm:py-10">
-        <div className="grid items-stretch gap-8 lg:grid-cols-2">
-          <motion.div
-            initial={{ opacity: 0, y: 14 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45 }}
-            className="flex flex-col justify-center"
-          >
-            <span className="inline-flex w-fit items-center gap-2 rounded-full border border-[hsl(35,92%,85%)] bg-[hsl(35,92%,95%)] px-3 py-1.5 text-xs font-semibold text-[hsl(30,100%,40%)]">
-              <Calendar className="h-[14px] w-[14px]" />
-              Édition 2026 — Inscriptions ouvertes
-            </span>
-            <h1 className="mt-4 text-4xl font-bold leading-[1.05] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-              Inscrivez vos enfants à la colonie de vacances 2026.
-            </h1>
-            <p className="mt-4 max-w-xl text-lg font-normal leading-relaxed text-slate-600">
-              Un portail officiel, sécurisé et transparent pour gérer les inscriptions des enfants des employés.
-              {/* Classement clair, suivi par email, démarche en moins de 5 minutes. */}
-            </p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                to="/admin-login"
-                onClick={logout}
-                className="inline-flex h-12 items-center gap-2 rounded-md bg-[#ff8000] px-6 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#e67900] hover:shadow-md"
-              >
-                <LogIn className="h-4 w-4" />
-                Accèder à mon espace
-              </Link>
-              <a
-                href="#programme"
-                className="inline-flex h-12 items-center rounded-md border border-slate-300 bg-white px-6 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Comment ça marche
-              </a>
-            </div>
-          </motion.div>
+      <section className="relative w-full overflow-hidden bg-gray-900">
+        <div className="relative h-[calc(100vh-4rem)] min-h-[500px] w-full overflow-hidden bg-gray-900">
+          <AnimatePresence mode="wait">
+            <motion.img
+              key={heroIndex}
+              src={heroImages[heroIndex]}
+              alt={`Colonie CSS ${heroIndex + 1}`}
+              width={1280}
+              height={896}
+              className="absolute inset-0 h-full w-full object-cover"
+              initial={{ opacity: 0, scale: 1.05 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.2, ease: "easeInOut" }}
+            />
+          </AnimatePresence>
 
-          <div className="relative overflow-hidden rounded-3xl bg-gray-900 shadow-2xl">
-            <AnimatePresence mode="wait">
-              <motion.img
-                key={heroIndex}
-                src={heroImages[heroIndex]}
-                alt={`Colonie CSS ${heroIndex + 1}`}
-                width={1280}
-                height={896}
-                className="h-full min-h-[420px] w-full object-cover"
-                initial={{ opacity: 0, scale: 1.05 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 1.2, ease: "easeInOut" }}
-              />
-            </AnimatePresence>
-            <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent" />
-            <div className="absolute left-4 top-4 rounded-lg bg-black/40 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-orange-100">
+          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+
+          <div className="absolute bottom-12 left-8 z-10 w-[min(90%,820px)] text-white sm:bottom-16">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-white/90 sm:text-sm">
               {heroCaptions[heroIndex]}
-            </div>
-            <div className="absolute bottom-4 right-4 flex items-center gap-2 rounded-full bg-white/90 px-3 py-2">
-              {heroImages.map((_, index) => (
-                <span
-                  key={`hero-indicator-${index}`}
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    index === heroIndex ? "w-7 bg-[#ff8600]" : "w-3 bg-slate-300"
-                  }`}
-                />
-              ))}
-            </div>
+            </p>
+            <h1 className="mt-3 text-4xl font-extrabold leading-tight sm:text-6xl">
+              Colonie de Vacances <span className="text-[#ff8600]">2026</span>
+            </h1>
+          </div>
+
+          <div className="absolute bottom-12 right-8 z-10 flex flex-wrap items-center justify-end gap-3 sm:bottom-16">
+            <Link
+              to="/admin-login"
+              onClick={logout}
+              className="inline-flex h-12 items-center gap-2 rounded-xl bg-[#ff8000] px-6 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#e67900] hover:shadow-md"
+            >
+              Se connecter
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <a
+              href="#programme"
+              className="inline-flex h-12 items-center rounded-xl border border-white/70 bg-white/10 px-6 text-sm font-semibold text-white backdrop-blur transition hover:bg-white/20"
+            >
+              Découvrir
+            </a>
+          </div>
+
+          <div className="absolute bottom-7 left-8 z-10 flex items-center gap-2">
+            {heroImages.map((_, index) => (
+              <button
+                type="button"
+                aria-label={`Aller à l'image ${index + 1}`}
+                onClick={() => setHeroIndex(index)}
+                key={`hero-indicator-${index}`}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  index === heroIndex ? "w-10 bg-[#ff8600]" : "w-4 bg-white/50"
+                }`}
+              />
+            ))}
           </div>
         </div>
       </section>
@@ -299,7 +286,7 @@ export default function HomePage() {
                 className="group relative overflow-hidden rounded-3xl border border-white/70 shadow-[0_30px_50px_-30px_rgba(15,23,42,0.75)]"
               >
                 <img
-                  src="/images/home/hero-1.jpeg"
+                  src="/images/home/hero-2.jpeg"
                   alt="Nos engagements"
                   width={1280}
                   height={896}
