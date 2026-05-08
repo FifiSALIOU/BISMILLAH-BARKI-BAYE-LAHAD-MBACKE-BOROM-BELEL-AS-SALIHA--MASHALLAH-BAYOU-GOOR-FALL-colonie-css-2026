@@ -654,6 +654,9 @@ export default function ParentDashboard() {
       console.error(err);
     }
   };
+  const editDateYear = Number((editDateNaissance || '').slice(0, 4));
+  const editDateNaissanceInvalide =
+    !!editDateNaissance && (!Number.isFinite(editDateYear) || editDateYear < 2012 || editDateYear > 2019);
 
   const getStatutStyle = (statut: string) => {
     switch (statut) {
@@ -1158,6 +1161,20 @@ export default function ParentDashboard() {
                         Remplacer
                       </Button>
                     )}
+                    {parentQueDesNonBio &&
+                      enfant.lienParente === 'Autre' &&
+                      !enfant.rejetDefinitif &&
+                      !listeFinaleDefinitiveApi && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleEditDemande(enfant)}
+                        className="rounded-lg gap-1 text-xs"
+                      >
+                        <FilePenLine className="w-3 h-3" />
+                        Modifier
+                      </Button>
+                    )}
                     {enfant.desistement === 'demandé' && !enfant.rejetDefinitif && !listeFinaleDefinitiveApi && (
                       <Button variant="outline" size="sm" onClick={() => handleAnnulerDesistement(enfant.id)} className="rounded-lg gap-1 text-xs text-amber-700 border-amber-300 hover:bg-amber-50">
                         <XCircle className="w-3 h-3" />Annuler désistement
@@ -1267,8 +1284,8 @@ export default function ParentDashboard() {
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full" style={{ gridTemplateColumns: listeFinaleApiPubliee ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)' }}>
             <TabsTrigger value="principale">Liste Principale</TabsTrigger>
-            <TabsTrigger value="attente_n1">Liste N°1</TabsTrigger>
-            <TabsTrigger value="attente_n2">Liste N°2</TabsTrigger>
+            <TabsTrigger value="attente_n1">Liste Attente N°1</TabsTrigger>
+            <TabsTrigger value="attente_n2">Liste Attente N°2 Enfants Non Codifiés</TabsTrigger>
             {listeFinaleApiPubliee && (
               <TabsTrigger value="liste_finale">Liste Finale</TabsTrigger>
             )}
@@ -1323,6 +1340,9 @@ export default function ParentDashboard() {
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Date de naissance</label>
               <Input type="date" value={editDateNaissance} onChange={(e) => setEditDateNaissance(e.target.value)} />
+              {editDateNaissanceInvalide && (
+                <p className="text-xs text-destructive">La date de naissance doit-etre comprise entre 2012 et 2019</p>
+              )}
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-foreground">Sexe</label>
@@ -1338,9 +1358,12 @@ export default function ParentDashboard() {
             <div className="space-y-2 sm:col-span-2">
               <label className="text-sm font-medium text-foreground">Lien de parenté</label>
               <select
-                className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                className={`w-full h-10 rounded-md border border-input px-3 text-sm ${
+                  parentQueDesNonBio ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'bg-background'
+                }`}
                 value={editLienParente}
                 onChange={(e) => setEditLienParente((e.target.value as LienParenteApi) || 'AUTRE')}
+                disabled={parentQueDesNonBio}
               >
                 <option value="PERE">Père</option>
                 <option value="MERE">Mère</option>
@@ -1351,7 +1374,13 @@ export default function ParentDashboard() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)} className="rounded-lg">Annuler</Button>
-            <Button onClick={confirmEditDemande} className="rounded-lg bg-accent text-white hover:bg-accent/90">Enregistrer la correction</Button>
+            <Button
+              onClick={confirmEditDemande}
+              className="rounded-lg bg-accent text-white hover:bg-accent/90"
+              disabled={editDateNaissanceInvalide}
+            >
+              Enregistrer la correction
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

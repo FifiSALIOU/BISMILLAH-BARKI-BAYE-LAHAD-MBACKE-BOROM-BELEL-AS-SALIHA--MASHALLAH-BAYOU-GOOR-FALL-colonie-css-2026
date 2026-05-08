@@ -340,7 +340,7 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
               )}
               {nonBiologiqueMode && (
                 <div className="space-y-2 sm:col-span-2">
-                  <Label className="text-foreground">Document justificatif (Extrait de naissance ou Certificat de scolarité) *</Label>
+                  <Label className="text-foreground">Document justificatif (Extrait de naissance) *</Label>
                   {/* <p className="text-xs text-muted-foreground">Téléverser / Uploader un ou plusieurs fichiers (exemple : recto et verso).</p> */}
                   <input
                     ref={fileInputRef}
@@ -488,7 +488,7 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
               <br /><br />
               {nonBiologiqueMode ? (
                 <span className="text-destructive font-medium">
-                  Attention : après confirmation, l&apos;inscription est définitive, vous ne pourrez plus modifier les renseignements saisis depuis cet espace. Vérifiez tout avant de valider.
+                  Attention : après confirmation, l&apos;inscription est enregistrée. Vous pourrez corriger les renseignements saisis depuis votre carte enfant si nécessaire.
                 </span>
               ) : (
                 <span className="text-destructive font-medium">
