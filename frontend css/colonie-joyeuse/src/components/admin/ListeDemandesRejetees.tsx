@@ -267,7 +267,7 @@ export default function ListeDemandesRejetees() {
   const handleVoirJustificatif = (demandeId: number, fileName: string | null | undefined) => {
     if (!token) return;
     setJustifPreviewLoading(true);
-    fetch(`${API_BASE_URL}/admin/demandes/${demandeId}/justificatif`, {
+    fetch(`${API_BASE_URL}/admin/demandes/${demandeId}/justificatif?t=${Date.now()}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async (res) => {

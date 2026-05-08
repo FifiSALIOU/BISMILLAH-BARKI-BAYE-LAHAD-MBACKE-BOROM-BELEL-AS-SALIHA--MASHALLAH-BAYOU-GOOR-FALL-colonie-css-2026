@@ -270,8 +270,12 @@ export default function InscrireEnfant({
   return (
     <div className={`mx-auto space-y-6 ${nonBiologiqueMode ? 'max-w-xl' : 'max-w-3xl'}`}>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-2xl font-bold text-foreground">Inscrire un enfant</h1>
-        {replacementMode && <h2 className="text-sm font-semibold text-accent mt-1">Remplacement</h2>}
+        <h1 className="text-2xl font-bold text-foreground">{replacementMode ? "Remplacement d'enfant" : 'Inscrire un enfant'}</h1>
+        {replacementMode && (
+          <p className="text-sm text-muted-foreground mt-1">
+            Les champs sont pre-remplis. Modifiez-les puis ajoutez le nouveau justificatif.
+          </p>
+        )}
         {!nonBiologiqueMode && (
           <p className="text-muted-foreground mt-1">
             Nouvelle inscription — {settings.colonieNom}. La limite sur les rôles Titulaire et Suppléant N°1 est gérée

@@ -311,7 +311,7 @@ export default function GestionListe({ type }: Props) {
   const handleVoirJustificatif = (enfant: Enfant) => {
     if (!token) return;
     const base = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-    fetch(`${base}/admin/demandes/${enfant.demandeId}/justificatif`, {
+    fetch(`${base}/admin/demandes/${enfant.demandeId}/justificatif?t=${Date.now()}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then(async (res) => {

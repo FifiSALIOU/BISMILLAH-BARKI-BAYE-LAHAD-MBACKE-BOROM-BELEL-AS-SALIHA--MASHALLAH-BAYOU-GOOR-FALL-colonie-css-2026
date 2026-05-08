@@ -700,6 +700,7 @@ def remplacer_enfant(
 
 @router.post("/remplacer-enfant-n2", response_model=DemandeOut)
 def remplacer_enfant_non_bio(
+    background: BackgroundTasks,
     demande_id: int = Form(...),
     enfant_prenom: str = Form(...),
     enfant_nom: str = Form(...),
@@ -709,8 +710,34 @@ def remplacer_enfant_non_bio(
     db: Session = Depends(get_db),
     user: User = Depends(require_roles(UserRole.PARENT)),
 ) -> DemandeOut:
+    def _label_liste_remplacement(code: str | None) -> str:
+        mapping = {
+            "PRINCIPALE": "Liste principale",
+            "ATTENTE_N1": "Liste d'attente N°1",
+            "ATTENTE_N2": "Liste d'attente N°2",
+        }
+        return mapping.get((code or "").strip().upper(), (code or "").strip())
+
     if enfant_sexe not in ("M", "F"):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sexe invalide.")
+
+    parent = db.query(Parent).filter(Parent.user_id == user.id).first()
+    old_demande = None
+    enfant_remplace = ""
+    liste_label = "—"
+    rang_conserve: int | None = None
+    if parent is not None:
+        old_demande = (
+            db.query(DemandeInscription)
+            .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
+            .filter(DemandeInscription.id == demande_id, Enfant.parent_id == parent.id)
+            .first()
+        )
+        if old_demande is not None:
+            enfant_remplace = f"{old_demande.enfant.prenom} {old_demande.enfant.nom}"
+            rang_conserve = old_demande.rang_dans_liste
+            liste_code = old_demande.liste.code.value if old_demande.liste and old_demande.liste.code else None
+            liste_label = _label_liste_remplacement(liste_code) if liste_code else "—"
 
     path, nom_fichier, mime, taille = _save_justificatifs_files(justificatif)
     demande = parent_remplacer_demande_non_bio_sans_changer_slot(
@@ -731,9 +758,35 @@ def remplacer_enfant_non_bio(
     demande.justificatif_valide = None
     demande.justificatif_valide_par_user_id = None
     demande.justificatif_valide_at = None
+    # Après remplacement non codifié, la demande repasse en attente de validation gestionnaire.
+    demande.statut = DemandeStatut.SOUMISE
+    demande.non_validation_reason = ""
+    demande.rejet_definitif = False
     demande.updated_at = now_utc
     db.commit()
     db.refresh(demande)
+
+    if parent is not None and old_demande is not None:
+        admin_emails = collect_admin_emails(db)
+        to_admins = uniq_emails(admin_emails)
+        if to_admins:
+            enfant_remplacant = f"{enfant_prenom.strip()} {enfant_nom.strip()}".strip()
+            when = datetime.now(timezone.utc)
+            background.add_task(
+                send_email,
+                to=to_admins,
+                subject=subject_remplacement_admin_notify(parent.matricule, enfant_remplacant),
+                body=body_remplacement_admin_notify(
+                    parent_matricule=parent.matricule,
+                    parent_prenom=parent.prenom,
+                    parent_nom=parent.nom,
+                    enfant_remplace=enfant_remplace,
+                    enfant_remplacant=enfant_remplacant,
+                    liste=liste_label,
+                    rang=rang_conserve,
+                    when=when,
+                ),
+            )
     return _to_demande_out(db, demande)
 
 

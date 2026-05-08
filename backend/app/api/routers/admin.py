@@ -694,6 +694,11 @@ def get_justificatif_file(
         path=path,
         media_type=demande.justificatif_mime_type or "application/octet-stream",
         filename=demande.justificatif_nom_fichier or "justificatif",
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
     )
 
 
