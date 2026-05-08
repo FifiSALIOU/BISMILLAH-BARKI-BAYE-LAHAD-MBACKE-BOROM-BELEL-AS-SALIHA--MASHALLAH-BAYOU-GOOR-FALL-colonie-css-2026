@@ -1,7 +1,9 @@
 {
   "colonieNom": "Colonie de Vacances 2026",
-  "dateDebutInscriptions": "2026-05-04",
-  "dateFinInscriptions": "2026-05-14",
+  "dateDebutInscriptions": "2026-05-08",
+  "heureDebutInscriptions": "13:27",
+  "dateFinInscriptions": "2026-05-27",
+  "heureFinInscriptions": "21:59",
   "dateDebutColonie": "2026-01-07",
   "dateFinColonie": "",
   "capaciteMax": 8,

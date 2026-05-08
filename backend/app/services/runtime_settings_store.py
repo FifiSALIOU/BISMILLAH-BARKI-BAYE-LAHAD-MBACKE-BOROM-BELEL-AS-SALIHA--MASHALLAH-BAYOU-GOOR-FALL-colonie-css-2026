@@ -9,7 +9,9 @@ from typing import Any
 DEFAULT_RUNTIME_SETTINGS: dict[str, Any] = {
     "colonieNom": "Colonie de Vacances 2026",
     "dateDebutInscriptions": "2026-01-01",
+    "heureDebutInscriptions": "00:00",
     "dateFinInscriptions": "2026-04-30",
+    "heureFinInscriptions": "23:59",
     "dateDebutColonie": "2026-07-01",
     "dateFinColonie": "2026-08-31",
     "capaciteMax": 100,
@@ -53,7 +55,9 @@ def merge_with_defaults(defaults: dict[str, Any]) -> dict[str, Any]:
 _PUBLIC_SETTINGS_KEYS = (
     "colonieNom",
     "dateDebutInscriptions",
+    "heureDebutInscriptions",
     "dateFinInscriptions",
+    "heureFinInscriptions",
     "dateDebutColonie",
     "dateFinColonie",
     "capaciteMax",

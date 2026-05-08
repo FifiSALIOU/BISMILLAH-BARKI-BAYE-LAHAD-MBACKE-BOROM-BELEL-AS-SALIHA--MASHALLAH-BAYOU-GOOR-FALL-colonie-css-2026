@@ -66,10 +66,11 @@ const calculateAge = (dateNaissance: string): number => {
   return age;
 };
 
-/** Liste finale : calculée uniquement après la fin de la journée de date de clôture. */
-function areInscriptionsClosed(cfg: { dateFinInscriptions?: string | null }): boolean {
+/** Liste finale : calculée uniquement après la date/heure de clôture configurées. */
+function areInscriptionsClosed(cfg: { dateFinInscriptions?: string | null; heureFinInscriptions?: string | null }): boolean {
   if (!cfg?.dateFinInscriptions) return false;
-  const dateFin = new Date(`${cfg.dateFinInscriptions}T23:59:59`);
+  const heureFin = cfg?.heureFinInscriptions || '23:59';
+  const dateFin = new Date(`${cfg.dateFinInscriptions}T${heureFin}:59`);
   return new Date() > dateFin;
 }
 
@@ -180,7 +181,8 @@ export default function ListeFinale() {
   }, [token, refreshTick]);
 
   const now = new Date();
-  const dateFin = settings.dateFinInscriptions ? new Date(settings.dateFinInscriptions + 'T23:59:59') : null;
+  const heureFin = settings.heureFinInscriptions || '23:59';
+  const dateFin = settings.dateFinInscriptions ? new Date(`${settings.dateFinInscriptions}T${heureFin}:59`) : null;
   const inscriptionsCloturees = dateFin ? now > dateFin : false;
 
   const getStatutBadge = (statut: string) => {

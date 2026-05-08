@@ -62,7 +62,9 @@ router = APIRouter(prefix="/admin", tags=["admin"])
 class RuntimeSettingsIn(BaseModel):
     colonieNom: str = Field(default="Colonie de Vacances 2026")
     dateDebutInscriptions: str = Field(default="2026-01-01")
+    heureDebutInscriptions: str = Field(default="00:00")
     dateFinInscriptions: str = Field(default="2026-04-30")
+    heureFinInscriptions: str = Field(default="23:59")
     dateDebutColonie: str = Field(default="2026-07-01")
     dateFinColonie: str = Field(default="2026-08-31")
     capaciteMax: int | None = Field(default=100)
@@ -157,7 +159,14 @@ def _read_runtime_settings() -> dict:
 
 def _liste_finale_reset_si_parametres_cles_changes(prev: dict, incoming: dict) -> bool:
     """True si capacité max, max enfants / parent ou dates d’inscription ont changé — réinitialise le cycle liste finale."""
-    keys = ("capaciteMax", "maxEnfantsParParent", "dateDebutInscriptions", "dateFinInscriptions")
+    keys = (
+        "capaciteMax",
+        "maxEnfantsParParent",
+        "dateDebutInscriptions",
+        "heureDebutInscriptions",
+        "dateFinInscriptions",
+        "heureFinInscriptions",
+    )
 
     def _norm_date(v: object) -> str:
         s = str(v or "").strip()
@@ -175,6 +184,9 @@ def _liste_finale_reset_si_parametres_cles_changes(prev: dict, incoming: dict) -
         a, b = prev.get(k), incoming.get(k)
         if k in ("dateDebutInscriptions", "dateFinInscriptions"):
             if _norm_date(a) != _norm_date(b):
+                return True
+        elif k in ("heureDebutInscriptions", "heureFinInscriptions"):
+            if str(a or "").strip() != str(b or "").strip():
                 return True
         elif k == "capaciteMax":
             if _norm_cap(a) != _norm_cap(b):

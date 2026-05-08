@@ -109,7 +109,9 @@ export interface Site {
 export interface AppSettings {
   colonieNom: string;
   dateDebutInscriptions: string;
+  heureDebutInscriptions: string;
   dateFinInscriptions: string;
+  heureFinInscriptions: string;
   dateDebutColonie: string;
   dateFinColonie: string;
   capaciteMax: number | null;
@@ -123,7 +125,9 @@ export interface AppSettings {
 export const DEFAULT_SETTINGS: AppSettings = {
   colonieNom: 'Colonie de Vacances 2026',
   dateDebutInscriptions: '2026-01-01',
+  heureDebutInscriptions: '00:00',
   dateFinInscriptions: '2026-04-30',
+  heureFinInscriptions: '23:59',
   dateDebutColonie: '2026-07-01',
   dateFinColonie: '2026-08-31',
   capaciteMax: 100,

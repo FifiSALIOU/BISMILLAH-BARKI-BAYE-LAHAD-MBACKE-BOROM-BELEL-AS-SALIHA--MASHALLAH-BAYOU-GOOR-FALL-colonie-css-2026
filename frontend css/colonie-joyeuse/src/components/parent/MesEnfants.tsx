@@ -13,7 +13,8 @@ export default function MesEnfants() {
   const { getEnfantsByParent, setTitulaire, demanderDesistement, annulerDesistement, reinscrireEnfant, getListeFinale, addHistorique, settings, getRangDansListe } = useInscription();
 
   const now = new Date();
-  const dateFin = settings.dateFinInscriptions ? new Date(settings.dateFinInscriptions + 'T23:59:59') : null;
+  const heureFin = settings.heureFinInscriptions || '23:59';
+  const dateFin = settings.dateFinInscriptions ? new Date(`${settings.dateFinInscriptions}T${heureFin}:59`) : null;
   const inscriptionsCloturees = dateFin ? now > dateFin : false;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedId, setSelectedId] = useState('');

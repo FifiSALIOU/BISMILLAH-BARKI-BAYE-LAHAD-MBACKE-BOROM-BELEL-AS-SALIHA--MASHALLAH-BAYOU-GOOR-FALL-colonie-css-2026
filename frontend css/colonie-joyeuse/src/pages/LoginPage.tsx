@@ -36,9 +36,13 @@ export default function LoginPage() {
     };
   }, []);
 
-  const today = new Date().toISOString().split('T')[0];
-  const inscriptionsClosed = !settings.inscriptionsOuvertes || today > settings.dateFinInscriptions;
-  const inscriptionsNotStarted = today < settings.dateDebutInscriptions;
+  const now = new Date();
+  const heureDebut = settings.heureDebutInscriptions || '00:00';
+  const heureFin = settings.heureFinInscriptions || '23:59';
+  const debutInscriptions = settings.dateDebutInscriptions ? new Date(`${settings.dateDebutInscriptions}T${heureDebut}:00`) : null;
+  const finInscriptions = settings.dateFinInscriptions ? new Date(`${settings.dateFinInscriptions}T${heureFin}:59`) : null;
+  const inscriptionsClosed = !settings.inscriptionsOuvertes || (finInscriptions ? now > finInscriptions : false);
+  const inscriptionsNotStarted = debutInscriptions ? now < debutInscriptions : false;
 
   const isEmail = (val: string) => val.includes('@');
 
@@ -69,7 +73,7 @@ export default function LoginPage() {
       }
       if (inscriptionsNotStarted) {
         setErrorTitle("Inscriptions pas encore ouvertes");
-        setErrorMessage(`La période d'inscription pour la Colonie de Vacances 2026 n'a pas encore commencé. Les inscriptions ouvriront le ${new Date(settings.dateDebutInscriptions).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}. Veuillez patienter jusqu'à cette date.`);
+        setErrorMessage(`La période d'inscription pour la Colonie de Vacances 2026 n'a pas encore commencé. Les inscriptions ouvriront le ${new Date(settings.dateDebutInscriptions).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} à ${heureDebut}. Veuillez patienter jusqu'à ce créneau.`);
         setErrorOpen(true);
         return;
       }
@@ -158,13 +162,13 @@ export default function LoginPage() {
           {inscriptionsNotStarted && (
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-center">
               <Info className="w-4 h-4 text-primary mx-auto mb-1" />
-              <p className="text-xs font-medium text-primary">Les inscriptions ouvriront le {new Date(settings.dateDebutInscriptions).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}.</p>
+              <p className="text-xs font-medium text-primary">Les inscriptions ouvriront le {new Date(settings.dateDebutInscriptions).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} à {heureDebut}.</p>
             </div>
           )}
 
           {inscriptionsClosed && !inscriptionsNotStarted && (
             <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-center">
-              <p className="text-xs font-medium text-destructive">⚠️ Les inscriptions sont fermées depuis le {new Date(settings.dateFinInscriptions).toLocaleDateString('fr-FR')}.</p>
+              <p className="text-xs font-medium text-destructive">⚠️ Les inscriptions sont fermées depuis le {new Date(settings.dateFinInscriptions).toLocaleDateString('fr-FR')} à {heureFin}.</p>
             </div>
           )}
 

@@ -148,8 +148,16 @@ export default function Parametres() {
               <Input type="date" value={settings.dateDebutInscriptions} onChange={e => patchSettings({ dateDebutInscriptions: e.target.value })} className="rounded-lg" />
             </div>
             <div className="space-y-2">
+              <Label className="text-foreground">Heure d'ouverture</Label>
+              <Input type="time" value={settings.heureDebutInscriptions || '00:00'} onChange={e => patchSettings({ heureDebutInscriptions: e.target.value || '00:00' })} className="rounded-lg" />
+            </div>
+            <div className="space-y-2">
               <Label className="text-foreground">Date de fin des inscriptions</Label>
               <Input type="date" value={settings.dateFinInscriptions} onChange={e => patchSettings({ dateFinInscriptions: e.target.value })} className="rounded-lg" />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-foreground">Heure de clôture</Label>
+              <Input type="time" value={settings.heureFinInscriptions || '23:59'} onChange={e => patchSettings({ heureFinInscriptions: e.target.value || '23:59' })} className="rounded-lg" />
             </div>
           </div>
           <div className="mt-4 bg-accent/5 border border-accent/20 rounded-lg p-3">

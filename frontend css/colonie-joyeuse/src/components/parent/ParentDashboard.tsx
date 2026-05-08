@@ -297,7 +297,8 @@ export default function ParentDashboard() {
   };
 
   const now = new Date();
-  const dateFin = settings.dateFinInscriptions ? new Date(settings.dateFinInscriptions + 'T23:59:59') : null;
+  const heureFinInscriptions = settings.heureFinInscriptions || '23:59';
+  const dateFin = settings.dateFinInscriptions ? new Date(`${settings.dateFinInscriptions}T${heureFinInscriptions}:59`) : null;
   const inscriptionsCloturees = dateFin ? now > dateFin : false;
 
   const MAX = settings.maxEnfantsParParent;

@@ -17,9 +17,10 @@ type RecentActivityRow = {
 };
 
 /** Même règle que la page « Liste finale » : pas de retenus affichés tant que les inscriptions ne sont pas clôturées. */
-function areInscriptionsClosed(cfg: { dateFinInscriptions?: string | null }): boolean {
+function areInscriptionsClosed(cfg: { dateFinInscriptions?: string | null; heureFinInscriptions?: string | null }): boolean {
   if (!cfg?.dateFinInscriptions) return false;
-  const dateFin = new Date(`${cfg.dateFinInscriptions}T23:59:59`);
+  const heureFin = cfg?.heureFinInscriptions || '23:59';
+  const dateFin = new Date(`${cfg.dateFinInscriptions}T${heureFin}:59`);
   return new Date() > dateFin;
 }
 

@@ -19,13 +19,16 @@ _LISTE_ORDRE: dict[ListeCode, int] = {
 
 
 def inscriptions_cloturees() -> bool:
-    """True uniquement après la fin de la journée de dateFinInscriptions (comme le front admin)."""
-    fin = read_settings().get("dateFinInscriptions")
+    """True uniquement après la date/heure de fin d'inscription configurée."""
+    cfg = read_settings()
+    fin = cfg.get("dateFinInscriptions")
+    heure_fin = str(cfg.get("heureFinInscriptions") or "23:59").strip() or "23:59"
     if fin is None or fin == "":
         return False
     try:
         date_part = str(fin).split("T")[0]
-        end_local = datetime.fromisoformat(f"{date_part}T23:59:59")
+        hh, mm = heure_fin.split(":")
+        end_local = datetime.fromisoformat(f"{date_part}T{int(hh):02d}:{int(mm):02d}:59")
     except (ValueError, OSError):
         return False
     return datetime.now() > end_local
