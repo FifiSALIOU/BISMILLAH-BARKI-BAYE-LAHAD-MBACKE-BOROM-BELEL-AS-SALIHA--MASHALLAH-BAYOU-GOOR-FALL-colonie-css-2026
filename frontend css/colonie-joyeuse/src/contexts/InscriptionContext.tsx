@@ -200,8 +200,8 @@ export function InscriptionProvider({ children }: { children: ReactNode }) {
     if (!settings.dateFinInscriptions) return false;
     const now = new Date();
     const heureFin = settings.heureFinInscriptions || '23:59';
-    const dateFin = new Date(`${settings.dateFinInscriptions}T${heureFin}:59`);
-    return now > dateFin;
+    const dateFin = new Date(`${settings.dateFinInscriptions}T${heureFin}:00`);
+    return now >= dateFin;
   };
 
   const getOrderedEligibleEnfants = () => {

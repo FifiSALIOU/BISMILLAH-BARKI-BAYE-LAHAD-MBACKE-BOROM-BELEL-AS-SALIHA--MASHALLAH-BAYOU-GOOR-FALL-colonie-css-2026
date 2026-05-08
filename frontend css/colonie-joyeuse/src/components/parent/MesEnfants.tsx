@@ -14,8 +14,8 @@ export default function MesEnfants() {
 
   const now = new Date();
   const heureFin = settings.heureFinInscriptions || '23:59';
-  const dateFin = settings.dateFinInscriptions ? new Date(`${settings.dateFinInscriptions}T${heureFin}:59`) : null;
-  const inscriptionsCloturees = dateFin ? now > dateFin : false;
+  const dateFin = settings.dateFinInscriptions ? new Date(`${settings.dateFinInscriptions}T${heureFin}:00`) : null;
+  const inscriptionsCloturees = dateFin ? now >= dateFin : false;
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [selectedId, setSelectedId] = useState('');
   const [selectedName, setSelectedName] = useState('');

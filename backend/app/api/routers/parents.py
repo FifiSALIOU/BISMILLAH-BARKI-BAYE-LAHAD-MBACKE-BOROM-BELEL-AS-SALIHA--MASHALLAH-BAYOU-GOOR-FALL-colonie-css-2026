@@ -32,6 +32,7 @@ from app.services.inscriptions import (
     create_inscription_for_parent_user,
     ensure_listes_exist,
     parent_corriger_demande_sans_changer_rang,
+    parent_remplacer_demande_non_bio_sans_changer_slot,
     remplacer_enfant_par_non_inscrit,
     reinscrire_desiste,
     request_desistement,
@@ -695,6 +696,45 @@ def remplacer_enfant(
             )
 
     return {"ok": True}
+
+
+@router.post("/remplacer-enfant-n2", response_model=DemandeOut)
+def remplacer_enfant_non_bio(
+    demande_id: int = Form(...),
+    enfant_prenom: str = Form(...),
+    enfant_nom: str = Form(...),
+    enfant_date_naissance: date = Form(...),
+    enfant_sexe: str = Form(...),
+    justificatif: list[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(require_roles(UserRole.PARENT)),
+) -> DemandeOut:
+    if enfant_sexe not in ("M", "F"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Sexe invalide.")
+
+    path, nom_fichier, mime, taille = _save_justificatifs_files(justificatif)
+    demande = parent_remplacer_demande_non_bio_sans_changer_slot(
+        db=db,
+        user=user,
+        demande_id=demande_id,
+        prenom=enfant_prenom,
+        nom=enfant_nom,
+        date_naissance=enfant_date_naissance,
+        sexe=Sexe.M if enfant_sexe == "M" else Sexe.F,
+    )
+    now_utc = datetime.now(timezone.utc)
+    demande.justificatif_path = path
+    demande.justificatif_nom_fichier = nom_fichier
+    demande.justificatif_mime_type = (mime or "")[:100] or None
+    demande.justificatif_taille = taille
+    demande.justificatif_uploaded_at = now_utc
+    demande.justificatif_valide = None
+    demande.justificatif_valide_par_user_id = None
+    demande.justificatif_valide_at = None
+    demande.updated_at = now_utc
+    db.commit()
+    db.refresh(demande)
+    return _to_demande_out(db, demande)
 
 
 @router.post("/desistement/{demande_id}")

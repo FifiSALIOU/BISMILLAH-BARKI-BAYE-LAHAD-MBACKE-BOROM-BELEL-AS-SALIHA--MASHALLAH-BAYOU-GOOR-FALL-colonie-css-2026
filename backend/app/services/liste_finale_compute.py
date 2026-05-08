@@ -28,10 +28,10 @@ def inscriptions_cloturees() -> bool:
     try:
         date_part = str(fin).split("T")[0]
         hh, mm = heure_fin.split(":")
-        end_local = datetime.fromisoformat(f"{date_part}T{int(hh):02d}:{int(mm):02d}:59")
+        end_local = datetime.fromisoformat(f"{date_part}T{int(hh):02d}:{int(mm):02d}:00")
     except (ValueError, OSError):
         return False
-    return datetime.now() > end_local
+    return datetime.now() >= end_local
 
 
 def demandes_liste_finale_retenus_si_cloturees(db: Session) -> list[DemandeInscription] | None:

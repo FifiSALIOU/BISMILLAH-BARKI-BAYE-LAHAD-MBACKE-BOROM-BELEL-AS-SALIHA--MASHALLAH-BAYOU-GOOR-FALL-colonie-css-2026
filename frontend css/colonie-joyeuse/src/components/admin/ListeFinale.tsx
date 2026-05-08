@@ -70,8 +70,8 @@ const calculateAge = (dateNaissance: string): number => {
 function areInscriptionsClosed(cfg: { dateFinInscriptions?: string | null; heureFinInscriptions?: string | null }): boolean {
   if (!cfg?.dateFinInscriptions) return false;
   const heureFin = cfg?.heureFinInscriptions || '23:59';
-  const dateFin = new Date(`${cfg.dateFinInscriptions}T${heureFin}:59`);
-  return new Date() > dateFin;
+  const dateFin = new Date(`${cfg.dateFinInscriptions}T${heureFin}:00`);
+  return new Date() >= dateFin;
 }
 
 export default function ListeFinale() {
@@ -182,8 +182,8 @@ export default function ListeFinale() {
 
   const now = new Date();
   const heureFin = settings.heureFinInscriptions || '23:59';
-  const dateFin = settings.dateFinInscriptions ? new Date(`${settings.dateFinInscriptions}T${heureFin}:59`) : null;
-  const inscriptionsCloturees = dateFin ? now > dateFin : false;
+  const dateFin = settings.dateFinInscriptions ? new Date(`${settings.dateFinInscriptions}T${heureFin}:00`) : null;
+  const inscriptionsCloturees = dateFin ? now >= dateFin : false;
 
   const getStatutBadge = (statut: string) => {
     switch (statut) {

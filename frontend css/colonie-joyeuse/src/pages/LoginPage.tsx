@@ -40,8 +40,8 @@ export default function LoginPage() {
   const heureDebut = settings.heureDebutInscriptions || '00:00';
   const heureFin = settings.heureFinInscriptions || '23:59';
   const debutInscriptions = settings.dateDebutInscriptions ? new Date(`${settings.dateDebutInscriptions}T${heureDebut}:00`) : null;
-  const finInscriptions = settings.dateFinInscriptions ? new Date(`${settings.dateFinInscriptions}T${heureFin}:59`) : null;
-  const inscriptionsClosed = !settings.inscriptionsOuvertes || (finInscriptions ? now > finInscriptions : false);
+  const finInscriptions = settings.dateFinInscriptions ? new Date(`${settings.dateFinInscriptions}T${heureFin}:00`) : null;
+  const inscriptionsClosed = !settings.inscriptionsOuvertes || (finInscriptions ? now >= finInscriptions : false);
   const inscriptionsNotStarted = debutInscriptions ? now < debutInscriptions : false;
 
   const isEmail = (val: string) => val.includes('@');

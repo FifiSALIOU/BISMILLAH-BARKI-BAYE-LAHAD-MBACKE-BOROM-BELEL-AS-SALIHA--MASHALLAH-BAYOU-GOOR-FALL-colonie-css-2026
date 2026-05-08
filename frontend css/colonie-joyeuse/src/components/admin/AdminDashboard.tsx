@@ -20,8 +20,8 @@ type RecentActivityRow = {
 function areInscriptionsClosed(cfg: { dateFinInscriptions?: string | null; heureFinInscriptions?: string | null }): boolean {
   if (!cfg?.dateFinInscriptions) return false;
   const heureFin = cfg?.heureFinInscriptions || '23:59';
-  const dateFin = new Date(`${cfg.dateFinInscriptions}T${heureFin}:59`);
-  return new Date() > dateFin;
+  const dateFin = new Date(`${cfg.dateFinInscriptions}T${heureFin}:00`);
+  return new Date() >= dateFin;
 }
 
 export default function AdminDashboard() {

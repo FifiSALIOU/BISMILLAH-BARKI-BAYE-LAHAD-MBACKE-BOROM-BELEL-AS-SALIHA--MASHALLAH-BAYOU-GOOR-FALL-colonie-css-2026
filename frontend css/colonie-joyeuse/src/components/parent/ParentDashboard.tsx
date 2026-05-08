@@ -157,6 +157,14 @@ export default function ParentDashboard() {
   const [demandeARemplacerId, setDemandeARemplacerId] = useState('');
   const [enfantARemplacerNom, setEnfantARemplacerNom] = useState('');
   const [demandeRemplacanteId, setDemandeRemplacanteId] = useState('');
+  const [replaceNonBioOpen, setReplaceNonBioOpen] = useState(false);
+  const [replaceNonBioDemandeId, setReplaceNonBioDemandeId] = useState<number | null>(null);
+  const [replaceNonBioInitial, setReplaceNonBioInitial] = useState<{
+    prenom: string;
+    nom: string;
+    dateNaissance: string;
+    sexe: 'M' | 'F';
+  } | null>(null);
 
   // Tabs
   const [activeTab, setActiveTab] = useState('principale');
@@ -298,8 +306,8 @@ export default function ParentDashboard() {
 
   const now = new Date();
   const heureFinInscriptions = settings.heureFinInscriptions || '23:59';
-  const dateFin = settings.dateFinInscriptions ? new Date(`${settings.dateFinInscriptions}T${heureFinInscriptions}:59`) : null;
-  const inscriptionsCloturees = dateFin ? now > dateFin : false;
+  const dateFin = settings.dateFinInscriptions ? new Date(`${settings.dateFinInscriptions}T${heureFinInscriptions}:00`) : null;
+  const inscriptionsCloturees = dateFin ? now >= dateFin : false;
 
   const MAX = settings.maxEnfantsParParent;
   const enfants = mesEnfants;
@@ -589,6 +597,18 @@ export default function ParentDashboard() {
     setEnfantARemplacerNom(`${enfant.prenom} ${enfant.nom}`);
     setDemandeRemplacanteId('');
     setRemplacerOpen(true);
+  };
+  const handleRemplacerNonBio = (enfant: Enfant) => {
+    const demandeId = getDemandeIdForAction(enfant);
+    if (!demandeId) return;
+    setReplaceNonBioDemandeId(demandeId);
+    setReplaceNonBioInitial({
+      prenom: enfant.prenom,
+      nom: enfant.nom,
+      dateNaissance: (enfant.dateNaissance || '').slice(0, 10),
+      sexe: enfant.sexe === 'F' ? 'F' : 'M',
+    });
+    setReplaceNonBioOpen(true);
   };
 
   const confirmRemplacement = async () => {
@@ -977,7 +997,7 @@ export default function ParentDashboard() {
             </h3>
             <p className="text-sm text-amber-700 mt-1">
               {allDesistes
-                ? 'Tous vos enfants ont été désistés et validés par le gestionnaire. Vous ne disposez plus d\'aucune action. Pour toute question, contactez l\'administration.'
+                ? 'Vous ne disposez plus d\'aucune action. Pour toute question, contactez l\'administration.'
                 : `Les inscriptions sont clôturées depuis le ${new Date(settings.dateFinInscriptions).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}. Vous ne pouvez plus inscrire de nouveaux enfants ni modifier vos inscriptions. Seule l'action de désistement reste disponible depuis vos cartes ci-dessous.`}
             </p>
           </div>
@@ -1163,6 +1183,21 @@ export default function ParentDashboard() {
                       </Button>
                     )}
                     {parentQueDesNonBio &&
+                      !inscriptionsCloturees &&
+                      enfant.lienParente === 'Autre' &&
+                      !enfant.rejetDefinitif &&
+                      !listeFinaleDefinitiveApi && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleRemplacerNonBio(enfant)}
+                        className="rounded-lg gap-1 text-xs"
+                      >
+                        Remplacer
+                      </Button>
+                    )}
+                    {parentQueDesNonBio &&
+                      !inscriptionsCloturees &&
                       enfant.lienParente === 'Autre' &&
                       !enfant.rejetDefinitif &&
                       !listeFinaleDefinitiveApi && (
@@ -1316,6 +1351,39 @@ export default function ParentDashboard() {
             onClose={() => { setInscrireOpen(false); setInscrireNonBioMode(false); }}
             nbEnfantsInscrits={enfants.length}
             nonBiologiqueMode={inscrireNonBioMode}
+            onInscriptionSuccess={() => { void loadAll(); }}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={replaceNonBioOpen}
+        onOpenChange={(open) => {
+          setReplaceNonBioOpen(open);
+          if (!open) {
+            setReplaceNonBioDemandeId(null);
+            setReplaceNonBioInitial(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto rounded-xl">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Inscrire un enfant</DialogTitle>
+            <DialogDescription>
+              Remplacement non codifié : les informations sont préremplies et le justificatif est requis.
+            </DialogDescription>
+          </DialogHeader>
+          <InscrireEnfant
+            onClose={() => {
+              setReplaceNonBioOpen(false);
+              setReplaceNonBioDemandeId(null);
+              setReplaceNonBioInitial(null);
+            }}
+            nbEnfantsInscrits={enfants.length}
+            nonBiologiqueMode
+            replacementMode
+            replaceDemandeId={replaceNonBioDemandeId}
+            initialEnfant={replaceNonBioInitial}
             onInscriptionSuccess={() => { void loadAll(); }}
           />
         </DialogContent>

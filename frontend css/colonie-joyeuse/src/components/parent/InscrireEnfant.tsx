@@ -25,9 +25,25 @@ interface InscrireEnfantProps {
   nbEnfantsInscrits?: number;
   onInscriptionSuccess?: () => void;
   nonBiologiqueMode?: boolean;
+  replacementMode?: boolean;
+  replaceDemandeId?: number | null;
+  initialEnfant?: {
+    prenom: string;
+    nom: string;
+    dateNaissance: string;
+    sexe: 'M' | 'F';
+  } | null;
 }
 
-export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscriptionSuccess, nonBiologiqueMode = false }: InscrireEnfantProps = {}) {
+export default function InscrireEnfant({
+  onClose,
+  nbEnfantsInscrits,
+  onInscriptionSuccess,
+  nonBiologiqueMode = false,
+  replacementMode = false,
+  replaceDemandeId = null,
+  initialEnfant = null,
+}: InscrireEnfantProps = {}) {
   const { parent, token, refreshParentProfile } = useAuth();
   const { getEnfantsByParent, settings, addHistorique } = useInscription();
 
@@ -98,6 +114,17 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
     }
   }, [previewOpen, previewUrl]);
 
+  useEffect(() => {
+    if (!replacementMode || !initialEnfant) return;
+    setPrenom(initialEnfant.prenom || '');
+    setNom(initialEnfant.nom || '');
+    setDateNaissance(initialEnfant.dateNaissance || '');
+    setSexe(initialEnfant.sexe || '');
+    setLienParente('AUTRE');
+    setDateNaissanceError('');
+    setJustificatifFiles([]);
+  }, [replacementMode, initialEnfant]);
+
   const handleSubmit = () => {
     if (!prenom.trim() || !nom.trim() || !dateNaissance || !sexe || (!nonBiologiqueMode && !lienParente) || (!nonBiologiqueMode && !telephone.trim())) {
       setErrorTitle("Champs requis");
@@ -143,7 +170,21 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
 
     try {
       if (!token) throw new Error('Session expirée');
-      if (nonBiologiqueMode) {
+      if (replacementMode) {
+        if (!replaceDemandeId) throw new Error('Demande introuvable pour le remplacement.');
+        const formData = new FormData();
+        formData.append('demande_id', String(replaceDemandeId));
+        formData.append('enfant_prenom', prenom.trim());
+        formData.append('enfant_nom', nom.trim());
+        formData.append('enfant_date_naissance', dateNaissance);
+        formData.append('enfant_sexe', sexe as 'M' | 'F');
+        justificatifFiles.forEach((file) => formData.append('justificatif', file));
+        await apiRequest('/parent/remplacer-enfant-n2', {
+          method: 'POST',
+          token,
+          body: formData,
+        });
+      } else if (nonBiologiqueMode) {
         const formData = new FormData();
         formData.append('enfant_prenom', prenom.trim());
         formData.append('enfant_nom', nom.trim());
@@ -195,7 +236,11 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
       return;
     }
 
-    if (nonBiologiqueMode) {
+    if (replacementMode) {
+      setSuccessMessage(`Le remplacement de ${prenom} ${nom} a été enregistré avec succès. Le rang, le slot, la date et l'heure d'inscription sont conservés.`);
+      setSuccessOpen(true);
+      setShowNextPrompt(false);
+    } else if (nonBiologiqueMode) {
       setNonBioLimiteEnfantLabel(`${prenom.trim()} ${nom.trim()}`);
       setNonBioLimiteDialogOpen(true);
     } else {
@@ -226,6 +271,7 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
     <div className={`mx-auto space-y-6 ${nonBiologiqueMode ? 'max-w-xl' : 'max-w-3xl'}`}>
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-2xl font-bold text-foreground">Inscrire un enfant</h1>
+        {replacementMode && <h2 className="text-sm font-semibold text-accent mt-1">Remplacement</h2>}
         {!nonBiologiqueMode && (
           <p className="text-muted-foreground mt-1">
             Nouvelle inscription — {settings.colonieNom}. La limite sur les rôles Titulaire et Suppléant N°1 est gérée
@@ -391,7 +437,7 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
 
           {nonBiologiqueMode ? (
             <Button onClick={handleSubmit} disabled={isDateInvalid} className="w-full rounded-lg bg-accent text-white hover:bg-accent/90 disabled:opacity-50">
-              Soumettre la demande
+              {replacementMode ? 'Remplacer' : 'Soumettre la demande'}
             </Button>
           ) : (
             <div className="flex justify-end gap-3 pt-4 border-t border-border">
@@ -471,7 +517,7 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
           <DialogHeader>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center"><AlertTriangle className="w-5 h-5 text-accent" /></div>
-              <DialogTitle className="text-foreground">Confirmer l'inscription</DialogTitle>
+              <DialogTitle className="text-foreground">{replacementMode ? 'Confirmer le remplacement' : "Confirmer l'inscription"}</DialogTitle>
             </div>
             <DialogDescription className="pt-2">
               Veuillez vérifier attentivement les informations saisies avant de confirmer :
@@ -499,7 +545,9 @@ export default function InscrireEnfant({ onClose, nbEnfantsInscrits, onInscripti
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)} className="rounded-lg">Vérifier à nouveau</Button>
-            <Button onClick={confirmInscription} className="rounded-lg bg-accent text-white hover:bg-accent/90">Confirmer l'inscription</Button>
+            <Button onClick={confirmInscription} className="rounded-lg bg-accent text-white hover:bg-accent/90">
+              {replacementMode ? 'Confirmer le remplacement' : "Confirmer l'inscription"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
