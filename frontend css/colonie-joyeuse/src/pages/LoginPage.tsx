@@ -15,6 +15,7 @@ import { KeyRound, AlertTriangle, Lock, Eye, EyeOff, Info } from 'lucide-react';
 export default function LoginPage() {
   const { loginAsParent, loginAsAdmin } = useAuth();
   const { settings, updateSettings } = useInscription();
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
@@ -27,9 +28,11 @@ export default function LoginPage() {
     apiRequest<Partial<AppSettings>>('/auth/public-settings')
       .then((cfg) => {
         if (!cancelled && cfg && typeof cfg === 'object') updateSettings(cfg);
+        if (!cancelled) setSettingsLoaded(true);
       })
       .catch(() => {
         /* garder DEFAULT_SETTINGS du contexte */
+        if (!cancelled) setSettingsLoaded(true);
       });
     return () => {
       cancelled = true;
@@ -159,14 +162,14 @@ export default function LoginPage() {
             </div>
           </div>
 
-          {inscriptionsNotStarted && (
+          {settingsLoaded && inscriptionsNotStarted && (
             <div className="bg-primary/5 border border-primary/20 rounded-lg p-3 text-center">
               <Info className="w-4 h-4 text-primary mx-auto mb-1" />
               <p className="text-xs font-medium text-primary">Les inscriptions ouvriront le {new Date(settings.dateDebutInscriptions).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })} à {heureDebut}.</p>
             </div>
           )}
 
-          {inscriptionsClosed && !inscriptionsNotStarted && (
+          {settingsLoaded && inscriptionsClosed && !inscriptionsNotStarted && (
             <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 text-center">
               <p className="text-xs font-medium text-destructive">⚠️ Les inscriptions sont fermées depuis le {new Date(settings.dateFinInscriptions).toLocaleDateString('fr-FR')} à {heureFin}.</p>
             </div>
