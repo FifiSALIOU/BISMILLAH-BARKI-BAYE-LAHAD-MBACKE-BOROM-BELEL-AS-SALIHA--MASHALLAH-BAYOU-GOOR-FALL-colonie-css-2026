@@ -1185,6 +1185,7 @@ export default function ParentDashboard() {
                     {parentQueDesNonBio &&
                       !inscriptionsCloturees &&
                       enfant.lienParente === 'Autre' &&
+                      !enfant.desistement &&
                       !enfant.rejetDefinitif &&
                       !listeFinaleDefinitiveApi && (
                       <Button
@@ -1199,6 +1200,7 @@ export default function ParentDashboard() {
                     {parentQueDesNonBio &&
                       !inscriptionsCloturees &&
                       enfant.lienParente === 'Autre' &&
+                      !enfant.desistement &&
                       !enfant.rejetDefinitif &&
                       !listeFinaleDefinitiveApi && (
                       <Button
