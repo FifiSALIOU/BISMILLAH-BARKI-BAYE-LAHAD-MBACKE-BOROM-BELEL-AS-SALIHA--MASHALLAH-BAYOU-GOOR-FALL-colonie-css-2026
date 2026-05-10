@@ -30,7 +30,7 @@ import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
 import InscrireEnfant from '@/components/parent/InscrireEnfant';
 import ListeFinaleParent from '@/components/parent/ListeFinaleParent';
-import { getTitulaireSwapBadgeKind, markTitulaireSwapBadges } from '@/lib/titulaireSwapBadges';
+import { getTitulaireSwapBadgeKind, markTitulaireSwapBadges, titulaireSwapBadgeKindForDisplay } from '@/lib/titulaireSwapBadges';
 
 type LienParenteApi = 'PERE' | 'MERE' | 'TUTEUR_LEGAL' | 'AUTRE';
 
@@ -832,13 +832,15 @@ export default function ParentDashboard() {
                   const p = allParents.find(x => x.matricule === e.parentMatricule);
                   const isHighlighted = highlightedEnfantId === e.id;
                   const did = idDemandePourRang(e);
-                  const swapBadgeKind =
+                  const swapBadgeKind = titulaireSwapBadgeKindForDisplay(
                     (liste === 'principale' || liste === 'attente_n1') && did >= 0
                       ? getTitulaireSwapBadgeKind({
                           parentMatricule: e.parentMatricule,
                           demandeId: did,
                         })
-                      : null;
+                      : null,
+                    e.statut,
+                  );
                   const rangAff =
                     typeof e.rangListe === 'number' && e.rangListe > 0
                       ? e.rangListe

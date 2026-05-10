@@ -75,3 +75,14 @@ export const getTitulaireSwapBadgeKind = ({ parentMatricule, demandeId }: Lookup
   if (Number(rec.exTitulaireDemandeId) === Number(demandeId)) return 'ex_titulaire';
   return null;
 };
+
+/** Affichage uniquement : aligne les pastilles « Promu » / « Ex-titulaire » sur le rôle actuel (pas de changement métier ni localStorage). */
+export const titulaireSwapBadgeKindForDisplay = (
+  kind: TitulaireSwapBadgeKind | null,
+  statut: 'Titulaire' | 'Suppléant N1' | 'Suppléant N2',
+): TitulaireSwapBadgeKind | null => {
+  if (!kind) return null;
+  if (kind === 'promoted' && statut === 'Titulaire') return 'promoted';
+  if (kind === 'ex_titulaire' && statut === 'Suppléant N1') return 'ex_titulaire';
+  return null;
+};

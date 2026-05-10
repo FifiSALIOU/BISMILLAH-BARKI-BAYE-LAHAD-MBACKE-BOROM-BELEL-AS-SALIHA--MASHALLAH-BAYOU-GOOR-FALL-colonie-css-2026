@@ -17,7 +17,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from '@/hooks/use-toast';
 import { apiRequest } from '@/lib/api';
 import { listeApiToUi, listeUiToApi, statutLabelFromListeUi, type ListeUi } from '@/lib/listeCodes';
-import { getTitulaireSwapBadgeKind } from '@/lib/titulaireSwapBadges';
+import { getTitulaireSwapBadgeKind, titulaireSwapBadgeKindForDisplay } from '@/lib/titulaireSwapBadges';
 
 type Enfant = {
   id: string;
@@ -478,13 +478,15 @@ export default function GestionListe({ type }: Props) {
                 enfantsOrdreArrivee.map((e) => {
                   const p = { nom: e.parentNom, prenom: e.parentPrenom, service: e.parentService, email: e.parentEmail, telephone: e.parentTelephone };
                   const validation = e.validation || 'en_attente';
-                  const swapBadgeKind =
+                  const swapBadgeKind = titulaireSwapBadgeKindForDisplay(
                     (type === 'principale' || type === 'attente_n1')
                       ? getTitulaireSwapBadgeKind({
                           parentMatricule: e.parentMatricule,
                           demandeId: e.demandeId,
                         })
-                      : null;
+                      : null,
+                    e.statut,
+                  );
                   return (
                     <TableRow
                       key={e.id}
