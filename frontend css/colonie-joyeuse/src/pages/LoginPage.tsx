@@ -210,7 +210,8 @@ export default function LoginPage() {
 
             <div className="bg-primary/5 rounded-lg p-3 border border-primary/20">
               <p className="text-xs text-muted-foreground">
-                <strong className="text-primary">📌 Note :</strong> Parent : matricule + mot de passe (par défaut <strong>Passer123</strong>). Administration : e-mail + mot de passe.
+                <strong className="text-primary">📌 Note :</strong> Parent : matricule + mot de passe (par défaut <strong>Passer123</strong>).
+                {/* Administration : e-mail + mot de passe. */}
               </p>
             </div>
 
