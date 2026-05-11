@@ -4,6 +4,7 @@ import { useInscription } from '@/contexts/InscriptionContext';
 import { Users, UserCheck, Clock, TrendingUp, Award, HandMetal } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiRequest } from '@/lib/api';
+import { listeUiToApi } from '@/lib/listeCodes';
 import { Button } from '@/components/ui/button';
 
 type RecentActivityRow = {
@@ -24,10 +25,18 @@ function areInscriptionsClosed(cfg: { dateFinInscriptions?: string | null; heure
   return new Date() >= dateFin;
 }
 
+const LISTES_COMPTÉES = new Set(['principale', 'attente_n1', 'attente_n2']);
+
+type ActivityBlocState =
+  | { status: 'loading' }
+  | { status: 'ready'; rows: RecentActivityRow[] }
+  | { status: 'fallback' };
+
 export default function AdminDashboard() {
   const { enfants, settings } = useInscription();
   const { token } = useAuth();
   const [statsApi, setStatsApi] = useState<any>(null);
+  const [activityBloc, setActivityBloc] = useState<ActivityBlocState>({ status: 'loading' });
 
   const loadStats = useCallback(async () => {
     if (!token) return;
@@ -39,17 +48,59 @@ export default function AdminDashboard() {
     }
   }, [token]);
 
+  /** Affichage « Activité récente » : mêmes endpoints que « Liste des inscriptions » (sans changer le backend). */
+  const loadActivityFromListes = useCallback(async () => {
+    if (!token) {
+      setActivityBloc({ status: 'fallback' });
+      return;
+    }
+    setActivityBloc({ status: 'loading' });
+    try {
+      const [p, n1, n2] = await Promise.all([
+        apiRequest<any[]>(`/admin/listes/${listeUiToApi('principale')}/demandes`, { token }),
+        apiRequest<any[]>(`/admin/listes/${listeUiToApi('attente_n1')}/demandes`, { token }),
+        apiRequest<any[]>(`/admin/listes/${listeUiToApi('attente_n2')}/demandes`, { token }),
+      ]);
+      const mapOne = (list: any[], listeUi: 'principale' | 'attente_n1' | 'attente_n2'): RecentActivityRow[] =>
+        list
+          .filter((d) => String(d.statut || '') !== 'DESISTEE')
+          .map((d) => ({
+            id: String(d.demande_id),
+            prenom: d.enfant?.prenom || '',
+            nom: d.enfant?.nom || '',
+            parent_prenom: d.parent_prenom,
+            parent_nom: d.parent_nom,
+            liste: listeUi,
+            date_inscription: d.date_inscription || '',
+          }));
+      const merged = [...mapOne(p, 'principale'), ...mapOne(n1, 'attente_n1'), ...mapOne(n2, 'attente_n2')];
+      const sorted = merged.sort((a, b) => {
+        const tb = new Date(b.date_inscription).getTime();
+        const ta = new Date(a.date_inscription).getTime();
+        if (Number.isFinite(tb) && Number.isFinite(ta) && tb !== ta) return tb - ta;
+        return Number(b.id) - Number(a.id);
+      });
+      setActivityBloc({ status: 'ready', rows: sorted.slice(0, 5) });
+    } catch {
+      setActivityBloc({ status: 'fallback' });
+    }
+  }, [token]);
+
   useEffect(() => {
-    loadStats();
-  }, [loadStats]);
+    void loadStats();
+    void loadActivityFromListes();
+  }, [loadStats, loadActivityFromListes]);
 
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === 'visible') void loadStats();
+      if (document.visibilityState === 'visible') {
+        void loadStats();
+        void loadActivityFromListes();
+      }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, [loadStats]);
+  }, [loadStats, loadActivityFromListes]);
 
   const ibl = statsApi?.inscriptions_by_liste;
   const sbl = statsApi?.selected_by_liste;
@@ -96,7 +147,7 @@ export default function AdminDashboard() {
   let cumulativePercent = 0;
 
   const recentFromApi = statsApi != null && Array.isArray(statsApi.recent_activity);
-  const recentRows: RecentActivityRow[] = recentFromApi
+  const recentRowsFallback: RecentActivityRow[] = recentFromApi
     ? statsApi.recent_activity
     : enfants.slice(-5).reverse().map(e => ({
         id: e.id,
@@ -108,10 +159,15 @@ export default function AdminDashboard() {
         date_inscription: e.dateInscription,
       }));
 
-  /** Affichage seulement : même périmètre que les cartes / donut (demandes sur Principale, N1 ou N2). Exclut les entrées « inconnue » ou hors ces listes. */
-  const LISTES_COMPTÉES = new Set(['principale', 'attente_n1', 'attente_n2']);
+  /** Affichage seulement : priorité aux 3 listes (aligné liste inscriptions) ; repli sur stats si échec réseau. */
   const recentRowsForDisplay: RecentActivityRow[] =
-    total === 0 ? [] : recentRows.filter(r => LISTES_COMPTÉES.has(r.liste));
+    total === 0
+      ? []
+      : activityBloc.status === 'ready'
+        ? activityBloc.rows
+        : activityBloc.status === 'loading'
+          ? []
+          : recentRowsFallback.filter(r => LISTES_COMPTÉES.has(r.liste));
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
