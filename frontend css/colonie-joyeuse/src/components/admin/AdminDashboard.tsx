@@ -108,8 +108,10 @@ export default function AdminDashboard() {
         date_inscription: e.dateInscription,
       }));
 
-  /** Affichage seulement : même périmètre que « Total inscriptions » (P+N1+N2). Si ce total est 0, pas de lignes sous « Activité récente ». */
-  const recentRowsForDisplay: RecentActivityRow[] = total === 0 ? [] : recentRows;
+  /** Affichage seulement : même périmètre que les cartes / donut (demandes sur Principale, N1 ou N2). Exclut les entrées « inconnue » ou hors ces listes. */
+  const LISTES_COMPTÉES = new Set(['principale', 'attente_n1', 'attente_n2']);
+  const recentRowsForDisplay: RecentActivityRow[] =
+    total === 0 ? [] : recentRows.filter(r => LISTES_COMPTÉES.has(r.liste));
 
   return (
     <div className="max-w-6xl mx-auto space-y-8">
