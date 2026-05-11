@@ -7,7 +7,8 @@ FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+# lovable-tagger déclare peer vite "<8" alors que le projet est en vite@8 — npm ci strict échoue en CI ; --legacy-peer-deps ne change pas le code, seule la résolution npm.
+RUN npm ci --legacy-peer-deps
 
 COPY . .
 
