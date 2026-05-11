@@ -1212,15 +1212,18 @@ def historique_actions(
         parent = enfant.parent
         cible = f"{enfant.prenom} {enfant.nom}"
 
-        _push_event(
-            key=f"inscription_{d.id}",
-            when=_inscription_event_time(d),
-            utilisateur=_parent_nom_journal(parent),
-            role_label="Parent",
-            action="Inscription",
-            details=f"Inscription de {cible} dans {_liste_libelle_journal(d)}",
-            cible=cible,
-        )
+        # Journal uniquement : masquer l’« Inscription » tant qu’aucune liste n’est assignée
+        # (ex. après chargement CSV des enfants), sans modifier le métier des demandes.
+        if d.liste_id is not None:
+            _push_event(
+                key=f"inscription_{d.id}",
+                when=_inscription_event_time(d),
+                utilisateur=_parent_nom_journal(parent),
+                role_label="Parent",
+                action="Inscription",
+                details=f"Inscription de {cible} dans {_liste_libelle_journal(d)}",
+                cible=cible,
+            )
 
         if bool(d.reinscrit_apres_desistement):
             _push_event(
