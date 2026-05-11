@@ -1,19 +1,25 @@
 # Pipeline GitLab : build + push de 2 images (backend, frontend) vers le Container Registry du projet.
-# Prérequis exécuteur : runner avec Docker (souvent image docker + service docker:dind, privileged si demandé par l’admin GitLab).
+# Schéma compatible GitLab.com / docker:dind (TLS désactivé entre client et dind — usage courant en CI).
 
 stages:
   - build
 
+# Évite les erreurs de certificat client ↔ dind sur de nombreux runners partagés
 variables:
-  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_HOST: tcp://docker:2375
+
+default:
+  image: docker:24-cli
+  services:
+    - name: docker:24-dind
+      alias: docker
+  before_script:
+    - for i in $(seq 1 60); do docker info && break || sleep 2; done
+    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
 
 build-backend:
   stage: build
-  image: docker:24-cli
-  services:
-    - docker:24-dind
-  before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
   script:
     - docker build -f backend/Dockerfile -t "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA" backend
     - docker push "$CI_REGISTRY_IMAGE/backend:$CI_COMMIT_SHORT_SHA"
@@ -25,11 +31,6 @@ build-backend:
 
 build-frontend:
   stage: build
-  image: docker:24-cli
-  services:
-    - docker:24-dind
-  before_script:
-    - docker login -u "$CI_REGISTRY_USER" -p "$CI_REGISTRY_PASSWORD" "$CI_REGISTRY"
   script:
     - |
       docker build \
