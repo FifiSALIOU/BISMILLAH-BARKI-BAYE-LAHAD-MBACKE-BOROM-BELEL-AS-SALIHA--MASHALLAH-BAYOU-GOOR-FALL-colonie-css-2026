@@ -1,0 +1,18 @@
+# Réduit le contexte Docker — ne change pas le comportement de l’app
+.env
+.venv
+venv
+__pycache__
+*.py[cod]
+*$py.class
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.log
+.git
+.gitignore
+Dockerfile
+.dockerignore
+backups
+*.backup
+*.dump

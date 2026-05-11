@@ -1,0 +1,11 @@
+# Réduit le contexte Docker — ne change pas le comportement de l’app
+node_modules
+dist
+.git
+.gitignore
+Dockerfile
+.dockerignore
+*.log
+.env
+.env.*
+!.env.example
