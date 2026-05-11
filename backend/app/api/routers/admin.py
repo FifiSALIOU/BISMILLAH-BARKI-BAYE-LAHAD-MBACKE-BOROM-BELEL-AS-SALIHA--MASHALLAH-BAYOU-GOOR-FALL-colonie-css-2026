@@ -1197,13 +1197,20 @@ def historique_actions(
             }
         )
 
+    # Journal : analyser plus de demandes que le plafond d’événements renvoyés, triées par
+    # dernière activité (évite qu’un lot récent « sans liste » occupe tout le quota et masque
+    # inscriptions / désistements plus pertinents).
+    demandes_scan = min(1200, max(400, safe_limit * 4))
     demandes = (
         db.query(DemandeInscription)
         .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
         .join(Parent, Parent.id == Enfant.parent_id)
         .outerjoin(Liste, Liste.id == DemandeInscription.liste_id)
-        .order_by(DemandeInscription.date_inscription.desc())
-        .limit(safe_limit)
+        .order_by(
+            func.coalesce(DemandeInscription.updated_at, DemandeInscription.created_at).desc(),
+            DemandeInscription.id.desc(),
+        )
+        .limit(demandes_scan)
         .all()
     )
 
@@ -1212,18 +1219,15 @@ def historique_actions(
         parent = enfant.parent
         cible = f"{enfant.prenom} {enfant.nom}"
 
-        # Journal uniquement : masquer l’« Inscription » tant qu’aucune liste n’est assignée
-        # (ex. après chargement CSV des enfants), sans modifier le métier des demandes.
-        if d.liste_id is not None:
-            _push_event(
-                key=f"inscription_{d.id}",
-                when=_inscription_event_time(d),
-                utilisateur=_parent_nom_journal(parent),
-                role_label="Parent",
-                action="Inscription",
-                details=f"Inscription de {cible} dans {_liste_libelle_journal(d)}",
-                cible=cible,
-            )
+        _push_event(
+            key=f"inscription_{d.id}",
+            when=_inscription_event_time(d),
+            utilisateur=_parent_nom_journal(parent),
+            role_label="Parent",
+            action="Inscription",
+            details=f"Inscription de {cible} dans {_liste_libelle_journal(d)}",
+            cible=cible,
+        )
 
         if bool(d.reinscrit_apres_desistement):
             _push_event(
@@ -1274,7 +1278,7 @@ def historique_actions(
         .join(Enfant, Enfant.id == DemandeInscription.enfant_id)
         .join(Parent, Parent.id == Enfant.parent_id)
         .order_by(Desistement.created_at.desc())
-        .limit(safe_limit)
+        .limit(demandes_scan)
         .all()
     )
 
