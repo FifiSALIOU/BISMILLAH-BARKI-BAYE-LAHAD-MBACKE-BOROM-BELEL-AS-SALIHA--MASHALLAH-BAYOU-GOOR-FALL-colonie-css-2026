@@ -2,8 +2,8 @@
   "colonieNom": "Colonie de Vacances 2026",
   "dateDebutInscriptions": "2026-05-08",
   "heureDebutInscriptions": "13:39",
-  "dateFinInscriptions": "2026-05-10",
-  "heureFinInscriptions": "18:02",
+  "dateFinInscriptions": "2026-05-11",
+  "heureFinInscriptions": "00:40",
   "dateDebutColonie": "2026-01-07",
   "dateFinColonie": "",
   "capaciteMax": 19,
@@ -12,6 +12,6 @@
   "ageMax": 2019,
   "inscriptionsOuvertes": true,
   "accesParentsActif": true,
-  "listeFinalePretePourValidation": true,
+  "listeFinalePretePourValidation": false,
   "listeFinaleValideeDefinitive": false
 }
