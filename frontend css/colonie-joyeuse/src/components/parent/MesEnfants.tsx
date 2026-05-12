@@ -322,7 +322,13 @@ export default function MesEnfants() {
                 <ArrowUpDown className="w-3 h-3 shrink-0" />Promouvoir en titulaire
               </Button>
             )}
-            <Button onClick={confirmDesistement} className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 whitespace-nowrap">Confirmer le désistement</Button>
+            <Button
+              onClick={confirmDesistement}
+              disabled={isTitulaireDesistement && Boolean(enfantN1) && !inscriptionsCloturees}
+              className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 whitespace-nowrap"
+            >
+              Confirmer le désistement
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

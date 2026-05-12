@@ -1204,7 +1204,8 @@ export default function ParentDashboard() {
                       enfant.lienParente === 'Autre' &&
                       !enfant.desistement &&
                       !enfant.rejetDefinitif &&
-                      !listeFinaleDefinitiveApi && (
+                      !listeFinaleDefinitiveApi &&
+                      !(enfant.liste === 'attente_n2' && enfant.validation === 'validé') && (
                       <Button
                         variant="outline"
                         size="sm"
@@ -1525,7 +1526,13 @@ export default function ParentDashboard() {
                 <ArrowUpDown className="w-3 h-3 shrink-0" />Promouvoir en titulaire
               </Button>
             )}
-            <Button onClick={confirmDesistement} className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 whitespace-nowrap">Confirmer le désistement</Button>
+            <Button
+              onClick={confirmDesistement}
+              disabled={isTitulaireDesistement && Boolean(enfantN1) && !inscriptionsCloturees}
+              className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 whitespace-nowrap"
+            >
+              Confirmer le désistement
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
