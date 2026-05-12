@@ -69,12 +69,12 @@ export default function MesEnfants() {
   const desistementTarget = enfants.find(e => e.id === desistementId);
   const isTitulaireDesistement = desistementTarget?.statut === 'Titulaire';
 
-  const handleSwapAndDesist = () => {
-    if (!enfantN1) return;
+  /** Même effet qu’avant (setTitulaire + badges + historique) ; retourne false si rien à faire ou impossible. */
+  const handleSwapAndDesist = (): boolean => {
+    if (!enfantN1) return false;
     const enfantN1DemandeId = getDemandeIdForAction(enfantN1);
     const ancienTitulaire = enfants.find((x) => x.statut === 'Titulaire' && x.liste === 'principale' && !x.desistement);
     const ancienTitulaireDemandeId = getDemandeIdForAction(ancienTitulaire);
-    // First swap: make N1 child the titulaire
     setTitulaire(parent.matricule, enfantN1.id);
     if (enfantN1DemandeId && ancienTitulaireDemandeId && enfantN1DemandeId !== ancienTitulaireDemandeId) {
       markTitulaireSwapBadges({
@@ -84,11 +84,13 @@ export default function MesEnfants() {
       });
     }
     addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Changement titulaire', details: `A défini ${enfantN1.prenom} ${enfantN1.nom} comme titulaire avant désistement`, cible: `${enfantN1.prenom} ${enfantN1.nom}` });
-    // Don't close dialog - let parent click "Confirmer le désistement" next
-    // The desistementId still points to the original child (now Suppléant N1)
+    return true;
   };
 
   const confirmDesistement = () => {
+    if (isTitulaireDesistement && enfantN1 && !inscriptionsCloturees) {
+      if (!handleSwapAndDesist()) return;
+    }
     demanderDesistement(desistementId);
     addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Désistement demandé', details: `A demandé le désistement de ${desistementName}`, cible: desistementName });
     setDesistementOpen(false);
@@ -309,7 +311,7 @@ export default function MesEnfants() {
                 {/* <p>Vous pourrez annuler cette demande tant que le gestionnaire ne l'a pas encore validée.</p> */}
                 {isTitulaireDesistement && enfantN1 && !inscriptionsCloturees && (
                   <p className="text-foreground font-medium">
-                    💡 Avant de confirmer, souhaitez-vous définir <strong>{enfantN1.prenom} {enfantN1.nom}</strong> (actuellement Suppléant N1) comme nouveau Titulaire ? Cliquez sur le bouton ci-dessous pour effectuer ce changement avant le désistement.
+                    💡 L&apos;enfant <strong className="text-foreground">{enfantN1.prenom} {enfantN1.nom}</strong>, qui figure actuellement sur la <strong>liste d&apos;attente n°1</strong> (suppléant N1), deviendra automatiquement <strong>titulaire</strong> lorsque vous confirmez. Le désistement de <strong>{desistementName}</strong> sera alors enregistré.
                   </p>
                 )}
               </div>
@@ -317,14 +319,8 @@ export default function MesEnfants() {
           </DialogHeader>
           <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
             <Button variant="outline" onClick={() => setDesistementOpen(false)} className="rounded-lg">Annuler</Button>
-            {isTitulaireDesistement && enfantN1 && !inscriptionsCloturees && (
-              <Button onClick={handleSwapAndDesist} variant="outline" className="rounded-lg gap-1 text-accent border-accent/30 hover:bg-accent hover:text-white hover:border-accent whitespace-normal text-left">
-                <ArrowUpDown className="w-3 h-3 shrink-0" />Promouvoir en titulaire
-              </Button>
-            )}
             <Button
               onClick={confirmDesistement}
-              disabled={isTitulaireDesistement && Boolean(enfantN1) && !inscriptionsCloturees}
               className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 whitespace-nowrap"
             >
               Confirmer le désistement

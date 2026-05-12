@@ -430,11 +430,18 @@ export default function ParentDashboard() {
   const desistementTarget = enfants.find(e => e.id === desistementId);
   const isTitulaireDesistement = desistementTarget?.statut === 'Titulaire';
 
-  const handleSwapAndDesist = async () => {
+  /** Même appels qu’avant le passage en automatique sur « Confirmer le désistement ». Retourne false si la promotion n’a pas pu être enregistrée. */
+  const handleSwapAndDesist = async (): Promise<boolean> => {
+    if (!enfantN1) return false;
     const demandeId = getDemandeIdForAction(enfantN1);
     const ancienTitulaire = enfants.find((x) => x.statut === 'Titulaire' && x.liste === 'principale' && !x.desistement);
     const ancienTitulaireDemandeId = getDemandeIdForAction(ancienTitulaire);
-    if (!demandeId || !token) return;
+    if (!demandeId || !token) {
+      if (!demandeId) {
+        toast({ title: 'Action impossible', description: 'Identifiant de demande manquant pour la promotion.', variant: 'destructive' });
+      }
+      return false;
+    }
     try {
       await apiRequest('/parent/titulaire', {
         method: 'POST',
@@ -450,15 +457,21 @@ export default function ParentDashboard() {
       }
       await loadAll();
       addHistorique({ utilisateur: `${parent.prenom} ${parent.nom}`, role: 'Parent', action: 'Changement titulaire', details: `A défini ${enfantN1.prenom} ${enfantN1.nom} comme titulaire avant désistement`, cible: `${enfantN1.prenom} ${enfantN1.nom}` });
+      return true;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Action impossible';
       toast({ title: 'Action impossible', description: msg, variant: 'destructive' });
       console.error(err);
+      return false;
     }
   };
 
   const confirmDesistement = async () => {
     if (!token) return;
+    if (isTitulaireDesistement && enfantN1 && !inscriptionsCloturees) {
+      const promoted = await handleSwapAndDesist();
+      if (!promoted) return;
+    }
     try {
       await apiRequest(`/parent/desistement/${Number(desistementId)}`, {
         method: 'POST',
@@ -1513,7 +1526,7 @@ export default function ParentDashboard() {
                 {/* <p>Vous pourrez annuler cette demande tant que le gestionnaire ne l'a pas encore validée.</p> */}
                 {isTitulaireDesistement && enfantN1 && !inscriptionsCloturees && (
                   <p className="text-foreground font-medium">
-                    💡 Avant de confirmer, souhaitez-vous définir <strong>{enfantN1.prenom} {enfantN1.nom}</strong> (actuellement Suppléant N1) comme nouveau Titulaire ? Cliquez sur le bouton ci-dessous pour effectuer ce changement avant le désistement.
+                    💡 L&apos;enfant <strong className="text-foreground">{enfantN1.prenom} {enfantN1.nom}</strong>, qui figure actuellement sur la <strong>liste d&apos;attente n°1</strong> (suppléant N1), deviendra automatiquement <strong>titulaire</strong> lorsque vous confirmez. Le désistement de <strong>{desistementName}</strong> sera alors enregistré.
                   </p>
                 )}
               </div>
@@ -1521,14 +1534,8 @@ export default function ParentDashboard() {
           </DialogHeader>
           <DialogFooter className="flex-col sm:flex-row gap-2 pt-2">
             <Button variant="outline" onClick={() => setDesistementOpen(false)} className="rounded-lg">Annuler</Button>
-            {isTitulaireDesistement && enfantN1 && !inscriptionsCloturees && (
-              <Button onClick={handleSwapAndDesist} variant="outline" className="rounded-lg gap-1 text-accent border-accent/30 hover:bg-accent hover:text-white hover:border-accent whitespace-normal text-left">
-                <ArrowUpDown className="w-3 h-3 shrink-0" />Promouvoir en titulaire
-              </Button>
-            )}
             <Button
-              onClick={confirmDesistement}
-              disabled={isTitulaireDesistement && Boolean(enfantN1) && !inscriptionsCloturees}
+              onClick={() => { void confirmDesistement(); }}
               className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 whitespace-nowrap"
             >
               Confirmer le désistement
