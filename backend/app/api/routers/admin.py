@@ -647,6 +647,7 @@ def _row_demande_lecture_admin(d: DemandeInscription) -> dict:
         "liste": liste.code.value,
         "rang": d.rang_dans_liste,
         "date_inscription": d.date_inscription,
+        "inscription_at": d.inscription_at.isoformat() if d.inscription_at else None,
         "created_at": d.created_at.isoformat() if d.created_at else None,
         "updated_at": d.updated_at.isoformat() if d.updated_at else None,
         "statut": d.statut.value,
