@@ -27,6 +27,8 @@ type Enfant = {
   liste: 'principale' | 'attente_n1' | 'attente_n2';
   statut: 'Titulaire' | 'Suppléant N1' | 'Suppléant N2';
   dateInscription: string;
+  /** Horodatage réel d'enregistrement (ISO). Utilisé uniquement pour l'affichage de l'heure. */
+  inscriptionAt?: string | null;
   /** `rang_dans_liste` API — même logique que `GET /parent/liste-finale`. */
   rangListe: number;
   demandeStatut?: string;
@@ -134,6 +136,7 @@ export default function ListeFinale() {
           liste: lu,
           statut: statutLabelFromListeUi(lu),
           dateInscription: d.date_inscription,
+          inscriptionAt: d.inscription_at ?? d.created_at ?? null,
           rangListe: rang,
           demandeStatut: d.statut || '',
           updatedAt: d.updated_at ?? null,
@@ -339,6 +342,8 @@ export default function ListeFinale() {
             <TableHead className="font-semibold">Sexe</TableHead>
             <TableHead className="font-semibold">Statut</TableHead>
             <TableHead className="font-semibold">Liste d'origine</TableHead>
+            <TableHead className="font-semibold">Inscrit le</TableHead>
+            <TableHead className="font-semibold">Heure Inscription</TableHead>
             {isDesistes && <TableHead className="font-semibold">Date du désistement</TableHead>}
             {isDesistes && <TableHead className="font-semibold">Heure du désistement</TableHead>}
             <TableHead className="font-semibold">Actions</TableHead>
@@ -346,7 +351,7 @@ export default function ListeFinale() {
         </TableHeader>
         <TableBody>
           {list.length === 0 ? (
-            <TableRow><TableCell colSpan={isDesistes ? 16 : 14} className="text-center py-12 text-muted-foreground">Aucun enfant</TableCell></TableRow>
+            <TableRow><TableCell colSpan={isDesistes ? 18 : 16} className="text-center py-12 text-muted-foreground">Aucun enfant</TableCell></TableRow>
           ) : (
             list.map((e, i) => {
               const p = { nom: e.parentNom, prenom: e.parentPrenom, telephone: e.parentTelephone, service: e.parentService, site: e.parentSite };
@@ -370,6 +375,8 @@ export default function ListeFinale() {
                   <TableCell>{e.sexe === 'M' ? 'M' : 'F'}</TableCell>
                   <TableCell><span className={`text-xs font-medium px-2 py-0.5 rounded-md ${getStatutBadge(e.statut)}`}>{e.statut}</span></TableCell>
                   <TableCell><span className="text-xs font-medium px-2 py-0.5 rounded-md bg-muted text-muted-foreground">{getListeLabel(e.liste)}</span></TableCell>
+                  <TableCell className="text-sm">{e.dateInscription ? new Date(e.dateInscription).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</TableCell>
+                  <TableCell className="text-sm">{e.inscriptionAt ? new Date(e.inscriptionAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</TableCell>
                   {isDesistes && <TableCell className="text-sm">{e.dateDesistement ? new Date(e.dateDesistement).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}</TableCell>}
                   {isDesistes && <TableCell className="text-sm">{e.dateDesistement ? new Date(e.dateDesistement).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—'}</TableCell>}
                   <TableCell>

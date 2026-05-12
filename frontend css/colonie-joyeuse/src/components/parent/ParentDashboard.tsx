@@ -1337,8 +1337,8 @@ export default function ParentDashboard() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full" style={{ gridTemplateColumns: listeFinaleApiPubliee ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)' }}>
-            <TabsTrigger value="principale">Liste Principale</TabsTrigger>
-            <TabsTrigger value="attente_n1">Liste Attente N°1</TabsTrigger>
+            <TabsTrigger value="principale">Liste Principale Enfants Codifiés</TabsTrigger>
+            <TabsTrigger value="attente_n1">Liste Attente N°1 Enfants Codifiés</TabsTrigger>
             <TabsTrigger value="attente_n2">Liste Attente N°2 Enfants Non Codifiés</TabsTrigger>
             {listeFinaleApiPubliee && (
               <TabsTrigger value="liste_finale">Liste Finale</TabsTrigger>
