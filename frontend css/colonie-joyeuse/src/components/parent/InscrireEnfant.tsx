@@ -134,7 +134,7 @@ export default function InscrireEnfant({
     }
     if (nonBiologiqueMode && justificatifFiles.length === 0) {
       setErrorTitle("Document requis");
-      setErrorMessage("Veuillez joindre un document justificatif (extrait de naissance ou certificat de scolarité).");
+      setErrorMessage("Veuillez joindre un document justificatif (extrait de naissance uniquement).");
       setErrorOpen(true);
       return;
     }
@@ -390,7 +390,7 @@ export default function InscrireEnfant({
               )}
               {nonBiologiqueMode && (
                 <div className="space-y-2 sm:col-span-2">
-                  <Label className="text-foreground">Document justificatif (Extrait de naissance) *</Label>
+                  <Label className="text-foreground">Document justificatif (Extrait de naissance uniquement) *</Label>
                   {/* <p className="text-xs text-muted-foreground">Téléverser / Uploader un ou plusieurs fichiers (exemple : recto et verso).</p> */}
                   <input
                     ref={fileInputRef}
