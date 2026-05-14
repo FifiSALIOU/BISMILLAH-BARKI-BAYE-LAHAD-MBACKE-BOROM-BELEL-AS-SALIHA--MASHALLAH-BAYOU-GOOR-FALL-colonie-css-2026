@@ -1,12 +1,10 @@
-"""Autorise demandes sans liste/rang avant choix parent.
+"""No-op : liste_id / rang_dans_liste nullable déjà dans le schéma initial (0001).
 
 Revision ID: 0013_demande_nullable_liste_rang
 Revises: 0012_demande_justificatif
 """
-from __future__ import annotations
 
-import sqlalchemy as sa
-from alembic import op
+from __future__ import annotations
 
 revision = "0013_demande_nullable_liste_rang"
 down_revision = "0012_demande_justificatif"
@@ -15,10 +13,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.alter_column("demandes", "liste_id", existing_type=sa.BigInteger(), nullable=True)
-    op.alter_column("demandes", "rang_dans_liste", existing_type=sa.Integer(), nullable=True)
+    pass
 
 
 def downgrade() -> None:
-    op.alter_column("demandes", "rang_dans_liste", existing_type=sa.Integer(), nullable=False)
-    op.alter_column("demandes", "liste_id", existing_type=sa.BigInteger(), nullable=False)
+    pass

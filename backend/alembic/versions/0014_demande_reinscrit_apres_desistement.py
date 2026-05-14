@@ -1,12 +1,10 @@
-"""Colonne reinscrit_apres_desistement sur demandes (badge Réinscrit fiable).
+"""No-op : reinscrit_apres_desistement déjà dans le schéma initial (0001).
 
 Revision ID: 0014_reinscrit_flag
 Revises: 0013_demande_nullable_liste_rang
 """
-from __future__ import annotations
 
-import sqlalchemy as sa
-from alembic import op
+from __future__ import annotations
 
 revision = "0014_reinscrit_flag"
 down_revision = "0013_demande_nullable_liste_rang"
@@ -15,17 +13,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "demandes",
-        sa.Column(
-            "reinscrit_apres_desistement",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.text("false"),
-        ),
-    )
-    op.alter_column("demandes", "reinscrit_apres_desistement", server_default=None)
+    pass
 
 
 def downgrade() -> None:
-    op.drop_column("demandes", "reinscrit_apres_desistement")
+    pass

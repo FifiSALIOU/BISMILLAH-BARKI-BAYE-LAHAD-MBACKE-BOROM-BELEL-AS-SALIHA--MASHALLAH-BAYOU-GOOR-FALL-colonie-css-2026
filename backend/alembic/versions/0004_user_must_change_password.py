@@ -1,15 +1,12 @@
-"""add must_change_password to users
+"""No-op : colonne must_change_password déjà dans le schéma initial (0001).
 
 Revision ID: 0004_user_must_change_password
 Revises: 0003_app_settings
 Create Date: 2026-03-25
 """
 
-from alembic import op
-import sqlalchemy as sa
+from __future__ import annotations
 
-
-# revision identifiers, used by Alembic.
 revision = "0004_user_must_change_password"
 down_revision = "0003_app_settings"
 branch_labels = None
@@ -17,11 +14,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "users",
-        sa.Column("must_change_password", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-    )
+    pass
 
 
 def downgrade() -> None:
-    op.drop_column("users", "must_change_password")
+    pass

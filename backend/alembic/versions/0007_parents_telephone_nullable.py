@@ -1,14 +1,12 @@
-"""Allow NULL on parents.telephone.
+"""No-op : téléphone nullable déjà dans le schéma initial (0001).
 
 Revision ID: 0007_parents_telephone_nullable
 Revises: 0006_resequence_rang_dans_liste
 Create Date: 2026-04-02
 """
 
-from alembic import op
+from __future__ import annotations
 
-
-# revision identifiers, used by Alembic.
 revision = "0007_parents_telephone_nullable"
 down_revision = "0006_resequence_rang_dans_liste"
 branch_labels = None
@@ -16,10 +14,8 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.execute("ALTER TABLE parents ALTER COLUMN telephone DROP NOT NULL;")
+    pass
 
 
 def downgrade() -> None:
-    # Ensure no NULL remains before restoring NOT NULL.
-    op.execute("UPDATE parents SET telephone = '-' WHERE telephone IS NULL;")
-    op.execute("ALTER TABLE parents ALTER COLUMN telephone SET NOT NULL;")
+    pass
