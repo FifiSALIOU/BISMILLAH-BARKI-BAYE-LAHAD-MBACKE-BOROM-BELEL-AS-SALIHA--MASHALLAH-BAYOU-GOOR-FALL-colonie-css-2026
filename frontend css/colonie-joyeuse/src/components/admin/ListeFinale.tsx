@@ -287,12 +287,19 @@ export default function ListeFinale() {
 
   const exportList = (list: Enfant[], filename: string, format: 'csv' | 'pdf', isDesistes = false) => {
     const baseHeaders = ['Rang', 'Matricule', 'Nom Parent', 'Prénom Parent', 'Téléphone', 'Service', 'Agence', 'Nom Enfant', 'Prénom Enfant', 'Âge', 'Sexe', 'Statut', "Liste d'origine"];
-    const headers = isDesistes ? [...baseHeaders, 'Date du désistement', 'Heure du désistement'] : baseHeaders;
+    const headers = isDesistes
+      ? [...baseHeaders, 'Date du désistement', 'Heure du désistement']
+      : [...baseHeaders, 'Inscrit le', 'Heure Inscription'];
     const rows = list.map((e, i) => {
       const baseRow = [i + 1, e.parentMatricule, e.parentNom || '', e.parentPrenom || '', e.parentTelephone || '', e.parentService || '', e.parentSite || '', e.nom, e.prenom, `${calculateAge(e.dateNaissance)} ans`, e.sexe === 'M' ? 'Masculin' : 'Féminin', e.statut, getListeLabel(e.liste)];
       if (isDesistes) {
         baseRow.push(e.dateDesistement ? new Date(e.dateDesistement).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—');
         baseRow.push(e.dateDesistement ? new Date(e.dateDesistement).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—');
+      } else {
+        baseRow.push(
+          e.dateInscription ? new Date(e.dateInscription).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }) : '—',
+          e.inscriptionAt ? new Date(e.inscriptionAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—',
+        );
       }
       return baseRow;
     });
